@@ -125,6 +125,14 @@ export function formatInt(lang: UiLang, value: number): string {
   return numberFormat(lang, { maximumFractionDigits: 0 }).format(value)
 }
 
+/** A number with a fixed number of decimals, e.g. a millisecond timing. */
+export function formatDecimal(lang: UiLang, value: number, digits = 1): string {
+  return numberFormat(lang, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value)
+}
+
 /** Shortened for tight spaces: `15.6K` / `15.6 ألف`. */
 export function formatCompact(lang: UiLang, value: number): string {
   return numberFormat(lang, { notation: 'compact', maximumFractionDigits: 1 }).format(value)
@@ -160,6 +168,22 @@ export function formatPointsDelta(lang: UiLang, deltaRatio: number): string {
 
   const unit = lang === 'ar' ? 'نقطة' : 'pts'
   return isolate(`${points}${NBSP}${unit}`)
+}
+
+/**
+ * A signed whole-number change, e.g. `+90` / `-90`.
+ *
+ * For counts, not rates: a call count does not move by "percentage points",
+ * and labelling a raw difference with a unit it does not have is exactly the
+ * kind of quiet dishonesty a KPI row should not contain.
+ *
+ * Returned already wrapped in FSI…PDI, for the same reason as
+ * {@link formatPointsDelta}.
+ */
+export function formatSignedInt(lang: UiLang, value: number): string {
+  return isolate(
+    numberFormat(lang, { signDisplay: 'always', maximumFractionDigits: 0 }).format(value),
+  )
 }
 
 /** One value with a localized unit, e.g. `3 mins` / `3 د`. */
