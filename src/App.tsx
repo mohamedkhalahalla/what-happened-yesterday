@@ -130,7 +130,7 @@ function Filtered({
         ) : (
           <Canvas
             layout={layout}
-            widgetProps={{ data, filters: state, showDelta }}
+            widgetProps={{ data, filters: state, showDelta, coverage, bounds }}
             onMove={moveWidget}
             onReorder={reorder}
             onResize={resizeWidget}

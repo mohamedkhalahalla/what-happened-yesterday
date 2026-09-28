@@ -148,6 +148,45 @@ export const ar: Record<MessageKey, string> = {
   'glossary.points': 'نقاط مئوية',
   'glossary.points.def': 'الفرق المباشر بين نسبتين. من 70% إلى 72% هو +2 نقطة، وليس +2%.',
 
+  'kpi.verdict.notable': 'تغيّر ملحوظ',
+  'kpi.verdict.normal': 'ضمن التغيّر الطبيعي',
+  'kpi.verdict.insufficient': 'عدد المكالمات أقل من أن يُقارَن',
+  'kpi.verdict.noComparison': 'لا تتوفر بيانات للمقارنة',
+  'kpi.showCalls': 'عرض المكالمات وراء {label}',
+  'chart.view.chart': 'رسم بياني',
+  'chart.view.table': 'جدول',
+  'chart.viewToggle': 'طريقة العرض',
+  'chart.keyboardHelp':
+    'استخدم مفاتيح الأسهم للتنقل بين الأيام، وHome وEnd لأول يوم وآخره، وEnter لعرض مكالمات ذلك اليوم.',
+  'chart.noData': 'لا توجد بيانات لعوامل التصفية هذه.',
+  'chart.legend': 'مفتاح الرسم',
+  'trend.title': 'الاتجاه اليومي',
+  'trend.resolutionPanel': 'نسبة الحل',
+  'trend.toolErrorPanel': 'نسبة أخطاء الأنظمة',
+  'trend.band.weekend': 'نهاية الأسبوع (الجمعة والسبت)',
+  'trend.band.ramadan': 'شهر على نمط رمضان',
+  'trend.band.selected': 'الفترة المختارة',
+  'trend.band.previous': 'الفترة السابقة',
+  'trend.series.resolution': 'نسبة الحل',
+  'trend.series.toolError': 'نسبة أخطاء الأنظمة',
+  'trend.point':
+    '{date}، {weekday}: نسبة الحل {resolution}، نسبة أخطاء الأنظمة {toolError}، {calls} مكالمة',
+  'trend.pointNoCalls': '{date}، {weekday}: لا مكالمات',
+  'trend.summary':
+    'بلغ متوسط نسبة الحل خلال الربع {quarterAverage}، وبلغ في الفترة المختارة {selectedAverage}. أدنى يوم كان {lowDate} بنسبة {lowRate}، وبلغت أخطاء الأنظمة ذروتها في {errorDate} بنسبة {errorRate}.',
+  'trend.summaryNoSelection':
+    'بلغ متوسط نسبة الحل خلال الربع {quarterAverage}. أدنى يوم كان {lowDate} بنسبة {lowRate}، وبلغت أخطاء الأنظمة ذروتها في {errorDate} بنسبة {errorRate}.',
+  'trend.summaryEmpty': 'لا توجد مكالمات تطابق عوامل التصفية هذه، فلا يوجد اتجاه لعرضه.',
+  'trend.summaryNoisy':
+    'بعض الأيام تقل مكالماتها عن {threshold} عند هذا المستوى من التصفية، لذا فالنسب اليومية غير مستقرة.',
+  'trend.tableCaption': 'نسبة الحل ونسبة أخطاء الأنظمة حسب اليوم',
+  'trend.col.date': 'التاريخ',
+  'trend.col.weekday': 'اليوم',
+  'trend.col.calls': 'المكالمات',
+  'trend.col.resolution': 'نسبة الحل',
+  'trend.col.toolError': 'نسبة أخطاء الأنظمة',
+  'trend.noCalls': 'لا مكالمات',
+
   'perf.readout':
     'احتُسبت خلال {worker} مللي ثانية (العامل) · {roundTrip} مللي ثانية ذهابًا وإيابًا',
 }

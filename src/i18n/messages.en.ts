@@ -155,6 +155,45 @@ export const en = {
   'glossary.points.def':
     'The plain difference between two percentages. From 70% to 72% is +2 points, not +2%.',
 
+  'kpi.verdict.notable': 'Notable change',
+  'kpi.verdict.normal': 'Within normal variation',
+  'kpi.verdict.insufficient': 'Too few calls to compare',
+  'kpi.verdict.noComparison': 'No comparison data',
+  'kpi.showCalls': 'Show the calls behind {label}',
+  'chart.view.chart': 'Chart',
+  'chart.view.table': 'Table',
+  'chart.viewToggle': 'View as',
+  'chart.keyboardHelp':
+    'Use the arrow keys to move between days, Home and End for the first and last day, and Enter to open the calls for that day.',
+  'chart.noData': 'No data for these filters.',
+  'chart.legend': 'Legend',
+  'trend.title': 'Daily trend',
+  'trend.resolutionPanel': 'Resolution rate',
+  'trend.toolErrorPanel': 'Tool-error rate',
+  'trend.band.weekend': 'Weekend (Fri-Sat)',
+  'trend.band.ramadan': 'Ramadan-style month',
+  'trend.band.selected': 'Selected period',
+  'trend.band.previous': 'Previous period',
+  'trend.series.resolution': 'Resolution rate',
+  'trend.series.toolError': 'Tool-error rate',
+  'trend.point':
+    '{date}, {weekday}: resolution {resolution}, tool-error rate {toolError}, {calls} calls',
+  'trend.pointNoCalls': '{date}, {weekday}: no calls',
+  'trend.summary':
+    'Across the quarter resolution averaged {quarterAverage}; the selected period averaged {selectedAverage}. The lowest day was {lowDate} at {lowRate}, and tool errors peaked on {errorDate} at {errorRate}.',
+  'trend.summaryNoSelection':
+    'Across the quarter resolution averaged {quarterAverage}. The lowest day was {lowDate} at {lowRate}, and tool errors peaked on {errorDate} at {errorRate}.',
+  'trend.summaryEmpty': 'No calls match these filters, so there is no trend to show.',
+  'trend.summaryNoisy':
+    'Some days have fewer than {threshold} calls at this filter level, so daily rates are noisy.',
+  'trend.tableCaption': 'Resolution and tool-error rate by day',
+  'trend.col.date': 'Date',
+  'trend.col.weekday': 'Weekday',
+  'trend.col.calls': 'Calls',
+  'trend.col.resolution': 'Resolution rate',
+  'trend.col.toolError': 'Tool-error rate',
+  'trend.noCalls': 'No calls',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

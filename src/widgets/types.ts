@@ -7,6 +7,7 @@
  */
 
 import type { Aggregates } from '../engine/types'
+import type { ComparisonCoverage, DataBounds } from '../state/presets'
 import type { FilterState } from '../state/url'
 
 export type WidgetProps = {
@@ -16,4 +17,14 @@ export type WidgetProps = {
   filters: FilterState
   /** False when there is no previous period to compare against. */
   showDelta: boolean
+  /**
+   * How much of the previous period exists in the data. Widgets need the
+   * distinction between "no change" and "nothing to compare with".
+   */
+  coverage: ComparisonCoverage
+  /**
+   * The edges of the dataset. The daily series is indexed from
+   * `bounds.firstDay`, so a widget cannot map it to dates without this.
+   */
+  bounds: DataBounds
 }

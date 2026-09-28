@@ -49,6 +49,10 @@ export type KpiCardProps = {
   deltaDirection?: number
   footnote?: ReactNode
   loading?: boolean
+  /** Makes the value a button that opens the calls behind it. */
+  onOpenDetails?: () => void
+  /** Accessible name for that button. Required whenever `onOpenDetails` is set. */
+  detailsLabel?: string
 }
 
 const DELTA_COLOR: Record<DeltaTone, string> = {
@@ -72,6 +76,8 @@ export function KpiCard({
   deltaDirection = 0,
   footnote,
   loading = false,
+  onOpenDetails,
+  detailsLabel,
 }: KpiCardProps) {
   const { t } = useI18n()
 
@@ -109,9 +115,24 @@ export function KpiCard({
     <div className="rounded-lg border border-border bg-card p-[18px] shadow-card">
       <div className="text-[12.5px] text-muted-foreground">{label}</div>
 
-      <div className="mt-2 text-[26px] leading-none font-semibold text-card-foreground">
-        <Num>{value}</Num>
-      </div>
+      {/*
+        The number itself is the control. A separate "details" link would be a
+        second thing to find on a card whose entire content is the one figure.
+      */}
+      {onOpenDetails === undefined ? (
+        <div className="mt-2 text-[26px] leading-none font-semibold text-card-foreground">
+          <Num>{value}</Num>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpenDetails}
+          aria-label={detailsLabel}
+          className="mt-2 rounded-md text-[26px] leading-none font-semibold text-card-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <Num>{value}</Num>
+        </button>
+      )}
 
       {delta !== undefined && (
         <div className={`mt-2.5 text-[12.5px] font-medium ${DELTA_COLOR[deltaTone]}`}>
