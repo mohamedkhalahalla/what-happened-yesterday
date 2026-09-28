@@ -308,3 +308,10 @@ export const HANDOFF_LABELS: Record<HandoffReason, BilingualLabel> = {
   policy: { ar: 'سياسة داخلية', en: 'Policy' },
   tool_error: { ar: 'خطأ في الأنظمة', en: 'Tool error' },
 }
+
+/** Display names for the language codes. See {@link OUTCOME_LABELS}. */
+export const LANGUAGE_LABELS: Record<Language, BilingualLabel> = {
+  ar: { ar: 'العربية', en: 'Arabic' },
+  en: { ar: 'الإنجليزية', en: 'English' },
+  mixed: { ar: 'مزيج', en: 'Mixed' },
+}
