@@ -41,7 +41,7 @@ export default tseslint.config(
   },
   {
     // Guardrail: no browser-local date access in any of our own code.
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
     rules: {
       'no-restricted-properties': [
         'error',
