@@ -283,3 +283,28 @@ export function intentIndex(id: string): number {
 export function agentIndex(id: string): number {
   return AGENTS.findIndex((a) => a.id === id)
 }
+
+/** A domain term in both UI languages. */
+export type BilingualLabel = { ar: string; en: string }
+
+/**
+ * Display names for the outcome codes.
+ *
+ * Domain vocabulary lives here beside the codes it names, not in the i18n
+ * message files: the message files are about the *UI*, and an outcome is part
+ * of the data model. Keyed by id rather than positional so it cannot silently
+ * drift out of alignment with {@link OUTCOMES}.
+ */
+export const OUTCOME_LABELS: Record<Outcome, BilingualLabel> = {
+  resolved: { ar: 'تم الحل', en: 'Resolved' },
+  transferred: { ar: 'تحويل لموظف', en: 'Transferred' },
+  abandoned: { ar: 'انقطاع المكالمة', en: 'Abandoned' },
+}
+
+/** Display names for the handoff-reason codes. See {@link OUTCOME_LABELS}. */
+export const HANDOFF_LABELS: Record<HandoffReason, BilingualLabel> = {
+  customer_request: { ar: 'طلب العميل', en: 'Customer request' },
+  low_confidence: { ar: 'ثقة منخفضة', en: 'Low confidence' },
+  policy: { ar: 'سياسة داخلية', en: 'Policy' },
+  tool_error: { ar: 'خطأ في الأنظمة', en: 'Tool error' },
+}
