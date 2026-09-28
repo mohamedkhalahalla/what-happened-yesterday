@@ -1,9 +1,140 @@
-:root {
-  font-family: system-ui, 'Segoe UI', Tahoma, sans-serif;
+/*
+ * Design tokens.
+ *
+ * The chrome palette (neutrals, brand, radii, shadows) is ported from my
+ * enigma-dashboard project so this reads as the same family of product, but
+ * every foreground/background pair was re-checked against WCAG AA and four
+ * were darkened — see the comments marked "AA:" below.
+ *
+ * Chart colours are a *separate* scale on purpose. Brand colours are chosen to
+ * look like the brand; categorical data colours have to stay distinguishable
+ * for the ~8% of men with colour-vision deficiency, which is a different job.
+ *
+ * Light theme only. Dark mode is out of scope for this exercise: it would mean
+ * a second full contrast pass, including the data palette, which loses its
+ * guarantees on a dark ground.
+ */
+
+@import 'tailwindcss';
+
+/* Self-hosted so the dashboard makes no third-party network request. */
+@import '@fontsource/ibm-plex-sans-arabic/400.css';
+@import '@fontsource/ibm-plex-sans-arabic/500.css';
+@import '@fontsource/ibm-plex-sans-arabic/600.css';
+
+@theme {
+  /* One family for both scripts: Arabic and Latin share metrics and colour,
+     so a mixed "رصيد 15.6K" line does not look like two pasted fragments. */
+  --font-sans:
+    'IBM Plex Sans Arabic', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* --- Neutrals ---------------------------------------------------------- */
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222.2 84% 4.9%);
+  --color-muted: hsl(210 40% 96%);
+  /* AA: 46.9% -> 45.5%. The original cleared 4.5:1 on white but only reached
+     4.34:1 on the muted surface it is routinely used on. */
+  --color-muted-foreground: hsl(215.4 16.3% 45.5%);
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-input: hsl(214.3 31.8% 88%);
+  --color-ring: hsl(214 72% 50%);
+
+  /* --- Brand ------------------------------------------------------------- */
+  --color-primary: hsl(214 72% 50%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-accent: hsl(214 90% 96%);
+  --color-accent-foreground: hsl(214 72% 40%);
+
+  /* --- Status ------------------------------------------------------------ */
+  /* AA: success 34% -> 31%, warning 45% -> 33.5%, info 40% -> 37%. All three
+     failed or only passed at large-text size as text on white; warning was the
+     worst at 2.63:1. Hues are unchanged, so the palette still reads the same. */
+  --color-success: hsl(142 72% 31%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(38 92% 33.5%);
+  --color-warning-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 74% 52%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-info: hsl(199 89% 37%);
+  --color-info-foreground: hsl(0 0% 100%);
+
+  /* --- Data palette: Okabe–Ito ------------------------------------------- */
+  /* Colour-blind-safe categorical scale. Deliberately not derived from the
+     brand: these must stay separable under deuteranopia and protanopia. */
+  --color-data-1: #e69f00; /* orange */
+  --color-data-2: #56b4e9; /* sky blue */
+  --color-data-3: #009e73; /* bluish green */
+  --color-data-4: #f0e442; /* yellow */
+  --color-data-5: #0072b2; /* blue */
+  --color-data-6: #d55e00; /* vermillion */
+  --color-data-7: #cc79a7; /* reddish purple */
+  --color-data-8: #000000; /* black */
+
+  /* Semantic data tokens. Good/bad is blue vs vermillion, never red vs green:
+     red/green as the *only* signal is invisible to the most common CVD. Both
+     also differ in lightness, so they survive greyscale printing. */
+  --color-good: #0072b2; /* = data-5, 5.19:1 on white */
+  --color-bad: #d55e00; /* = data-6, 3.87:1 on white */
+  --color-neutral: hsl(215.4 16.3% 45.5%);
+
+  /* --- Radii (ported) ---------------------------------------------------- */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.5625rem;
+  --radius-lg: 0.875rem;
+
+  /* --- Elevation (ported) ------------------------------------------------ */
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.06), 0 1px 3px 0 rgb(16 24 40 / 0.04);
+  --shadow-card-hover: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.05);
+}
+
+/* --- Base ---------------------------------------------------------------- */
+
+html {
+  font-family: var(--font-sans);
   line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  padding: 1rem;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/*
+ * Tabular numerals wherever numbers are compared vertically or change in
+ * place: a KPI that shifts width as it ticks from 999 to 1,000 reads as the
+ * layout twitching rather than the number moving.
+ */
+.tnum,
+th,
+td,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Visible only to assistive technology — the text equivalent of a bar. */
+.sr-only-text {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
