@@ -23,6 +23,36 @@ const LOCAL_DATE_ACCESSORS = [
 const LOCAL_DATE_MESSAGE =
   'Use src/lib/time/riyadh.ts — dates must be Asia/Riyadh, not browser-local.'
 
+const FORMATTING_MESSAGE = 'Format through src/lib/format.ts (explicit locale + Asia/Riyadh)'
+
+/**
+ * Formatting that silently adopts the host's locale and time zone. Banned
+ * everywhere except `src/lib/format.ts`, which pins both explicitly.
+ *
+ * `toLocaleString` is included with no argument-count escape hatch: passing a
+ * locale still leaves the time zone to the host, and the number cases have no
+ * time zone to get wrong but do have digits — `toLocaleString()` in an Arabic
+ * locale yields ٤٢ rather than the Western digits this app uses throughout.
+ */
+const FORMATTING_VIOLATIONS = [
+  {
+    selector: 'CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/]',
+    message: FORMATTING_MESSAGE,
+  },
+  {
+    selector: 'MemberExpression[computed=true] > Literal[value=/^toLocale(Date|Time)?String$/]',
+    message: FORMATTING_MESSAGE,
+  },
+  {
+    selector: 'NewExpression[callee.object.name="Intl"]',
+    message: FORMATTING_MESSAGE,
+  },
+  {
+    selector: 'MemberExpression[object.name="Intl"]',
+    message: FORMATTING_MESSAGE,
+  },
+]
+
 export default tseslint.config(
   { ignores: ['dist', 'coverage', 'node_modules'] },
   {
@@ -51,19 +81,41 @@ export default tseslint.config(
         })),
       ],
       // `no-restricted-properties` only sees static member access, so also
-      // catch `d['getHours']()`, `toLocaleDateString()` without a timeZone,
-      // and bare identifier references such as `const f = d.getDay`.
+      // catch `d['getHours']()` and bare identifier references such as
+      // `const f = d.getDay`.
       'no-restricted-syntax': [
         'error',
         ...LOCAL_DATE_ACCESSORS.map((property) => ({
           selector: `MemberExpression[computed=true] > Literal[value=${JSON.stringify(property)}]`,
           message: LOCAL_DATE_MESSAGE,
         })),
-        {
-          selector:
-            'CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/][arguments.length<2]',
+        // Unlocalized formatting. `toLocaleString()` and friends take the
+        // host's locale *and* time zone, which is two wrong answers at once;
+        // a bare `new Intl.*` is the same mistake spelled out. Both are
+        // allowed only in format.ts, which is configured below.
+        ...FORMATTING_VIOLATIONS,
+      ],
+    },
+  },
+  {
+    // Two exemptions from the formatting ban, both deliberate and named
+    // individually rather than by a blanket "tests may do anything":
+    //
+    // - format.ts is the one module that may construct formatters. It is where
+    //   the explicit locale and Asia/Riyadh time zone are applied.
+    // - riyadh.test.ts cross-checks our own integer date maths against Intl's
+    //   tz database (with an explicit timeZone). Verifying the thing the rule
+    //   protects requires reaching past the rule.
+    //
+    // Adding a file here should feel like a decision, which is the point.
+    files: ['src/lib/format.ts', 'src/lib/time/riyadh.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...LOCAL_DATE_ACCESSORS.map((property) => ({
+          selector: `MemberExpression[computed=true] > Literal[value=${JSON.stringify(property)}]`,
           message: LOCAL_DATE_MESSAGE,
-        },
+        })),
       ],
     },
   },
