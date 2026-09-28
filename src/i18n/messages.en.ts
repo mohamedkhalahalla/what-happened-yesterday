@@ -19,7 +19,7 @@ export const en = {
   'lang.toggle': 'العربية',
   'lang.toggleAria': 'Switch to Arabic',
 
-  'user.switcher': 'Signed in as',
+  'user.switcher': 'Viewing as',
   'user.abdullah.name': 'Abdullah',
   'user.abdullah.role': 'Director of Customer Care',
   'user.vp.name': 'Layla',
@@ -39,7 +39,6 @@ export const en = {
   'state.retry': 'Try again',
 
   'filters.preset.lastWeek': 'Last week',
-  'filters.preset.last7Days': 'Last 7 days',
   'filters.preset.last30Days': 'Last 30 days',
   'filters.preset.quarter': 'Whole quarter',
   'filters.preset.custom': 'Custom',

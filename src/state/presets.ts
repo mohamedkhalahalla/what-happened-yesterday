@@ -29,10 +29,10 @@ export function boundsOf(dataset: { firstDay: number; days: number }): DataBound
   return { firstDay: dataset.firstDay, lastDay, today: lastDay + 1 }
 }
 
-export type PresetId = 'lastWeek' | 'last7Days' | 'last30Days' | 'quarter' | 'custom'
+export type PresetId = 'lastWeek' | 'last30Days' | 'quarter' | 'custom'
 
 /** The presets offered as buttons, in the order they are shown. */
-export const PRESET_IDS = ['lastWeek', 'last7Days', 'last30Days', 'quarter'] as const
+export const PRESET_IDS = ['lastWeek', 'last30Days', 'quarter'] as const
 
 /** Keep a range inside the data, and never inverted. */
 function clampRange(range: DayRangeQuery, bounds: DataBounds): DayRangeQuery {
@@ -60,8 +60,6 @@ export function presetRange(
       const from = startOfWeek(bounds.today) - 7
       return clampRange({ from, to: from + 6 }, bounds)
     }
-    case 'last7Days':
-      return clampRange({ from: yesterday - 6, to: yesterday }, bounds)
     case 'last30Days':
       return clampRange({ from: yesterday - 29, to: yesterday }, bounds)
     case 'quarter':

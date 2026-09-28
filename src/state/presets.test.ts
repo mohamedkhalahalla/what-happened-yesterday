@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { dayIndexToISO, isoToDayIndex, weekday } from '../lib/time/riyadh'
 import {
+  PRESET_IDS,
   activePreset,
   boundsOf,
   comparisonCoverage,
@@ -40,10 +41,6 @@ describe('presetRange', () => {
     expect(weekday(presetRange('lastWeek', bounds).to)).toBe(6) // Saturday
   })
 
-  it('last7Days is the seven days ending yesterday', () => {
-    expect(iso(presetRange('last7Days', bounds))).toEqual(['2026-09-20', '2026-09-26'])
-  })
-
   it('last30Days is the thirty days ending yesterday', () => {
     expect(iso(presetRange('last30Days', bounds))).toEqual(['2026-08-28', '2026-09-26'])
     const range = presetRange('last30Days', bounds)
@@ -80,8 +77,18 @@ describe('presetRange on a mid-week "today"', () => {
     expect(weekday(midWeek.today)).toBe(3)
 
     expect(iso(presetRange('lastWeek', midWeek))).toEqual(['2026-09-20', '2026-09-26'])
-    // Where a rolling window would have drifted:
-    expect(iso(presetRange('last7Days', midWeek))).toEqual(['2026-09-23', '2026-09-29'])
+    // A rolling seven-day window would have drifted to 09-23..09-29 here,
+    // cutting across two weekends. That is exactly why the preset is
+    // Sunday-anchored rather than rolling.
+  })
+})
+
+describe('PRESET_IDS', () => {
+  it('offers exactly three presets', () => {
+    // "Last 7 days" was removed: whenever today is a Sunday it is the same
+    // seven days as "Last week", and two buttons that do the same thing make
+    // a person wonder which one is subtly different.
+    expect([...PRESET_IDS]).toEqual(['lastWeek', 'last30Days', 'quarter'])
   })
 })
 
@@ -92,17 +99,8 @@ describe('activePreset', () => {
     expect(activePreset(presetRange('quarter', bounds), bounds)).toBe('quarter')
   })
 
-  it('resolves the lastWeek / last7Days tie in favour of lastWeek', () => {
-    // On this dataset today is a Sunday, so the two presets are the same seven
-    // days and no function could tell them apart. First match wins, and
-    // lastWeek is the one a person would have meant.
-    expect(presetRange('last7Days', bounds)).toEqual(presetRange('lastWeek', bounds))
-    expect(activePreset(presetRange('last7Days', bounds), bounds)).toBe('lastWeek')
-  })
-
-  it('distinguishes them when today is not a Sunday', () => {
+  it('recognises lastWeek whatever day of the week today is', () => {
     const midWeek = boundsOf({ firstDay: day('2026-06-29'), days: 93 })
-    expect(activePreset(presetRange('last7Days', midWeek), midWeek)).toBe('last7Days')
     expect(activePreset(presetRange('lastWeek', midWeek), midWeek)).toBe('lastWeek')
   })
 

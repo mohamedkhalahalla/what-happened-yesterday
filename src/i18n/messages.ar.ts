@@ -14,7 +14,7 @@ export const ar: Record<MessageKey, string> = {
   'lang.toggle': 'English',
   'lang.toggleAria': 'التبديل إلى الإنجليزية',
 
-  'user.switcher': 'تسجيل الدخول باسم',
+  'user.switcher': 'عرض باسم',
   'user.abdullah.name': 'عبدالله',
   'user.abdullah.role': 'مدير العناية بالعملاء',
   'user.vp.name': 'ليلى',
@@ -34,7 +34,6 @@ export const ar: Record<MessageKey, string> = {
   'state.retry': 'إعادة المحاولة',
 
   'filters.preset.lastWeek': 'الأسبوع الماضي',
-  'filters.preset.last7Days': 'آخر 7 أيام',
   'filters.preset.last30Days': 'آخر 30 يومًا',
   'filters.preset.quarter': 'الربع كامل',
   'filters.preset.custom': 'مخصص',

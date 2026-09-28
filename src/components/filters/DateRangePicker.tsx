@@ -24,7 +24,6 @@ import {
 
 const PRESET_LABEL_KEY = {
   lastWeek: 'filters.preset.lastWeek',
-  last7Days: 'filters.preset.last7Days',
   last30Days: 'filters.preset.last30Days',
   quarter: 'filters.preset.quarter',
 } as const
