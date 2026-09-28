@@ -1,7 +1,7 @@
 /**
- * App shell. The body is temporary demo content — four KPIs and one breakdown
- * bar for the last full week — and gets replaced by the real dashboard next.
- * The header, persistence and perf readout are not temporary.
+ * App shell. The body is still demo content — four KPIs and one breakdown bar
+ * — but it now follows the filters, and it obeys the comparison-coverage rule:
+ * when there is no previous period in the data, no delta is shown at all.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -10,6 +10,7 @@ import { AppHeader } from './components/AppHeader'
 import { Card } from './components/Card'
 import { KpiCard, type DeltaTone } from './components/KpiCard'
 import { StackedBar, type StackedSegment } from './components/Bars'
+import { FilterBar } from './components/filters/FilterBar'
 import { EngineClient } from './engine/client'
 import type { Counts } from './engine/types'
 import { I18nProvider } from './i18n/I18nProvider'
@@ -20,10 +21,11 @@ import {
   formatInt,
   formatPercent,
   formatPointsDelta,
+  formatPointsMagnitude,
   formatSignedInt,
   type UiLang,
 } from './lib/format'
-import { isoToDayIndex } from './lib/time/riyadh'
+import { boundsOf, comparisonCoverage, type DataBounds } from './state/presets'
 import {
   DEFAULT_PREFS,
   loadCurrentUser,
@@ -32,20 +34,8 @@ import {
   savePrefs,
   type UserId,
 } from './state/prefs'
-
-/** The last full week in the dataset: Sunday 2026-09-20 to Saturday 2026-09-26. */
-const LAST_FULL_WEEK = {
-  from: isoToDayIndex('2026-09-20'),
-  to: isoToDayIndex('2026-09-26'),
-}
-
-type Snapshot = {
-  current: Counts
-  previous: Counts
-  lastDataDay: number
-  workerMs: number
-  roundTripMs: number
-}
+import { useAggregates } from './state/useAggregates'
+import { useFilterState } from './state/useFilterState'
 
 /** Share of `value` in `total`, as a ratio. No division by zero. */
 function rate(value: number, total: number): number {
@@ -70,20 +60,15 @@ function toneFor(delta: number, higherIsBetter: boolean): DeltaTone {
   return good ? 'good' : 'bad'
 }
 
-function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: boolean }) {
+type DashboardProps = {
+  current: Counts
+  previous: Counts
+  /** False when there is no previous period, or the reader turned comparison off. */
+  showDelta: boolean
+}
+
+function Dashboard({ current, previous, showDelta }: DashboardProps) {
   const { lang, t } = useI18n()
-
-  if (loading || snapshot === null) {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <KpiCard key={i} label="" value="" loading />
-        ))}
-      </div>
-    )
-  }
-
-  const { current, previous } = snapshot
 
   const resolution = rateDelta(current, previous, (c) => c.resolved)
   const transfer = rateDelta(current, previous, (c) => c.transferred)
@@ -97,6 +82,7 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
       label: t('kpi.resolutionRate'),
       value: formatPercent(lang, resolution.value),
       delta: formatPointsDelta(lang, resolution.delta),
+      magnitude: formatPointsMagnitude(lang, resolution.delta),
       direction: resolution.delta,
       tone: toneFor(resolution.delta, true),
     },
@@ -105,6 +91,7 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
       label: t('kpi.transferRate'),
       value: formatPercent(lang, transfer.value),
       delta: formatPointsDelta(lang, transfer.delta),
+      magnitude: formatPointsMagnitude(lang, transfer.delta),
       direction: transfer.delta,
       tone: toneFor(transfer.delta, false),
     },
@@ -113,6 +100,7 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
       label: t('kpi.abandonmentRate'),
       value: formatPercent(lang, abandonment.value),
       delta: formatPointsDelta(lang, abandonment.delta),
+      magnitude: formatPointsMagnitude(lang, abandonment.delta),
       direction: abandonment.delta,
       tone: toneFor(abandonment.delta, false),
     },
@@ -121,6 +109,7 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
       label: t('kpi.calls'),
       value: formatInt(lang, current.calls),
       delta: formatSignedInt(lang, callsDelta),
+      magnitude: formatInt(lang, Math.abs(callsDelta)),
       direction: callsDelta,
       tone: toneFor(callsDelta, true),
     },
@@ -145,7 +134,9 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
             key={kpi.key}
             label={kpi.label}
             value={kpi.value}
-            delta={kpi.delta}
+            // No previous period means no delta — not a delta of -100%.
+            delta={showDelta ? kpi.delta : undefined}
+            deltaMagnitude={kpi.magnitude}
             deltaTone={kpi.tone}
             deltaDirection={kpi.direction}
           />
@@ -159,17 +150,71 @@ function Dashboard({ snapshot, loading }: { snapshot: Snapshot | null; loading: 
   )
 }
 
-function PerfReadout({ snapshot }: { snapshot: Snapshot | null }) {
+function KpiSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {[0, 1, 2, 3].map((i) => (
+        <KpiCard key={i} label="" value="" loading />
+      ))}
+    </div>
+  )
+}
+
+function PerfReadout({
+  workerMs,
+  roundTripMs,
+  isFetching,
+}: {
+  workerMs: number
+  roundTripMs: number
+  isFetching: boolean
+}) {
   const { lang, t } = useI18n()
-  if (snapshot === null) return null
 
   return (
     <p className="text-[11.5px] text-muted-foreground" data-numeric>
       {t('perf.readout', {
-        worker: formatDecimal(lang, snapshot.workerMs),
-        roundTrip: formatDecimal(lang, snapshot.roundTripMs),
+        worker: formatDecimal(lang, workerMs),
+        roundTrip: formatDecimal(lang, roundTripMs),
       })}
+      {/* Only appears once a request has been slow enough to be worth saying. */}
+      {isFetching && <span className="ms-2 font-medium">{t('state.updating')}</span>}
     </p>
+  )
+}
+
+function Filtered({ client, bounds }: { client: EngineClient | null; bounds: DataBounds }) {
+  const { state, corrections, update } = useFilterState(bounds)
+  const { data, isFetching, workerMs, roundTripMs, error } = useAggregates(client, state)
+
+  const coverage = comparisonCoverage(state.range, bounds)
+  // Both must hold: the reader asked for a comparison, and one exists to make.
+  const showDelta = state.compare && coverage !== 'none'
+
+  return (
+    <>
+      <FilterBar
+        state={state}
+        bounds={bounds}
+        coverage={coverage}
+        corrections={corrections}
+        onChange={update}
+      />
+
+      <div className="mt-4">
+        {error !== null && data === null ? (
+          <Card title="" state="error" errorMessage={error} />
+        ) : data === null ? (
+          <KpiSkeleton />
+        ) : (
+          <Dashboard current={data.current} previous={data.previous} showDelta={showDelta} />
+        )}
+      </div>
+
+      <div className="mt-6">
+        <PerfReadout workerMs={workerMs} roundTripMs={roundTripMs} isFetching={isFetching} />
+      </div>
+    </>
   )
 }
 
@@ -180,62 +225,49 @@ function Shell({
   currentUser: UserId
   onUserChange: (u: UserId) => void
 }) {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [client, setClient] = useState<EngineClient | null>(null)
+  const [bounds, setBounds] = useState<DataBounds | null>(null)
+  const [initError, setInitError] = useState<string | null>(null)
   const { t } = useI18n()
 
   useEffect(() => {
-    const client = new EngineClient()
+    const engine = new EngineClient()
     let cancelled = false
 
     void (async () => {
       try {
-        const dataset = await client.init()
-        const response = await client.aggregate({
-          range: LAST_FULL_WEEK,
-          agents: [],
-          intents: [],
-          languages: [],
-        })
-        if (cancelled || response.stale) return
-
-        setSnapshot({
-          current: response.result.current,
-          previous: response.result.previous,
-          lastDataDay: dataset.firstDay + dataset.days - 1,
-          workerMs: response.workerMs,
-          roundTripMs: response.roundTripMs,
-        })
+        const dataset = await engine.init()
+        if (cancelled) return
+        setBounds(boundsOf(dataset))
+        setClient(engine)
       } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause))
+        if (!cancelled) setInitError(cause instanceof Error ? cause.message : String(cause))
       }
     })()
 
     return () => {
       cancelled = true
-      client.dispose()
+      engine.dispose()
     }
   }, [])
 
   return (
     <div className="min-h-screen bg-background">
       <AppHeader
-        lastDataDay={snapshot?.lastDataDay ?? null}
+        lastDataDay={bounds?.lastDay ?? null}
         currentUser={currentUser}
         onUserChange={onUserChange}
       />
 
       <main className="mx-auto max-w-[1200px] px-5 py-6">
-        {error !== null ? (
-          <Card title={t('state.error')} state="error" errorMessage={error} />
+        {initError !== null ? (
+          <Card title={t('state.error')} state="error" errorMessage={initError} />
+        ) : bounds === null ? (
+          <KpiSkeleton />
         ) : (
-          <Dashboard snapshot={snapshot} loading={snapshot === null} />
+          <Filtered client={client} bounds={bounds} />
         )}
       </main>
-
-      <footer className="mx-auto max-w-[1200px] px-5 pb-6">
-        <PerfReadout snapshot={snapshot} />
-      </footer>
     </div>
   )
 }
