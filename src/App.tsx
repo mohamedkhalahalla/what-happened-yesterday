@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppHeader } from './components/AppHeader'
 import { Card } from './components/Card'
 import { Canvas } from './components/canvas/Canvas'
+import { CanvasToolbar } from './components/canvas/CanvasToolbar'
+import { UndoToast } from './components/canvas/UndoToast'
 import { FilterBar } from './components/filters/FilterBar'
 import { EngineClient } from './engine/client'
 import { I18nProvider } from './i18n/I18nProvider'
@@ -26,6 +28,8 @@ import {
 import { useAggregates } from './state/useAggregates'
 import { useFilterState } from './state/useFilterState'
 import { useLayout } from './state/useLayout'
+import type { RemovedWidget } from './state/layout'
+import type { WidgetId } from './widgets/registry'
 
 function PerfReadout({
   workerMs,
@@ -59,13 +63,48 @@ function Filtered({
   bounds: DataBounds
   userId: UserId
 }) {
+  const { t } = useI18n()
   const { state, corrections, update } = useFilterState(bounds)
   const { data, isFetching, workerMs, roundTripMs, error } = useAggregates(client, state)
-  const { layout, moveWidget, reorder, resizeWidget, removeWidget } = useLayout(userId)
+  const {
+    layout,
+    moveWidget,
+    reorder,
+    resizeWidget,
+    removeWidget,
+    restoreWidget,
+    addWidget,
+    resetLayout,
+  } = useLayout(userId)
+
+  /*
+   * What the undo toast is holding. `token` is part of the state rather than a
+   * ref because it is rendered: it increments per removal so that removing a
+   * second widget restarts the toast timer instead of inheriting the remains
+   * of the first one.
+   */
+  const [pendingUndo, setPendingUndo] = useState<{
+    record: RemovedWidget
+    token: number
+  } | null>(null)
+  const [focusWidgetId, setFocusWidgetId] = useState<WidgetId | null>(null)
 
   const coverage = comparisonCoverage(state.range, bounds)
   // Both must hold: the reader asked for a comparison, and one exists to make.
   const showDelta = state.compare && coverage !== 'none'
+
+  const onRemoveWidget = (id: WidgetId): void => {
+    const record = removeWidget(id)
+    if (record === null) return
+    setPendingUndo((previous) => ({ record, token: (previous?.token ?? 0) + 1 }))
+  }
+
+  const onAddWidget = (id: WidgetId): void => {
+    addWidget(id)
+    // A widget appended below the fold is invisible feedback; moving focus to
+    // it is what says "this happened".
+    setFocusWidgetId(id)
+  }
 
   return (
     <>
@@ -77,7 +116,15 @@ function Filtered({
         onChange={update}
       />
 
-      <div className="mt-4">
+      <div className="mt-4 flex justify-end">
+        <CanvasToolbar
+          present={layout.items.map((item) => item.id)}
+          onAdd={onAddWidget}
+          onReset={resetLayout}
+        />
+      </div>
+
+      <div className="mt-3">
         {error !== null && data === null ? (
           <Card title="" state="error" errorMessage={error} />
         ) : (
@@ -87,10 +134,25 @@ function Filtered({
             onMove={moveWidget}
             onReorder={reorder}
             onResize={resizeWidget}
-            onRemove={(id) => void removeWidget(id)}
+            onRemove={onRemoveWidget}
+            focusWidgetId={focusWidgetId}
           />
         )}
       </div>
+
+      {pendingUndo !== null && (
+        <UndoToast
+          token={pendingUndo.token}
+          message={t('widget.removed')}
+          actionLabel={t('widget.undo')}
+          onAction={() => {
+            restoreWidget(pendingUndo.record)
+            setFocusWidgetId(pendingUndo.record.item.id)
+            setPendingUndo(null)
+          }}
+          onDismiss={() => setPendingUndo(null)}
+        />
+      )}
 
       <div className="mt-6">
         <PerfReadout workerMs={workerMs} roundTripMs={roundTripMs} isFetching={isFetching} />

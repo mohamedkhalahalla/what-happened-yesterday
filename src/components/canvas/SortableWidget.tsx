@@ -11,6 +11,8 @@
  * Arabic and top-left in English with no code and no physical properties.
  */
 
+import { useEffect, useRef } from 'react'
+
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -29,6 +31,8 @@ export type SortableWidgetProps = {
   onMove: (delta: number) => void
   onResize: (size: { w?: WidgetWidth; h?: WidgetHeight }) => void
   onRemove: () => void
+  /** True for a widget that was just added, so focus follows it. */
+  shouldFocus?: boolean
 }
 
 export function SortableWidget({
@@ -39,6 +43,7 @@ export function SortableWidget({
   onMove,
   onResize,
   onRemove,
+  shouldFocus = false,
 }: SortableWidgetProps) {
   const { t } = useI18n()
   const {
@@ -55,9 +60,24 @@ export function SortableWidget({
   const title = t(definition.titleKey)
   const Body = definition.component
 
+  /*
+   * Adding a widget from the catalog appends it below the fold, so moving
+   * focus to it is what tells a keyboard or screen-reader user that anything
+   * happened at all. tabIndex -1 makes the section focusable programmatically
+   * without adding a stop to the tab order for everyone else.
+   */
+  const sectionRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (shouldFocus) sectionRef.current?.focus()
+  }, [shouldFocus])
+
   return (
     <section
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node)
+        sectionRef.current = node
+      }}
+      tabIndex={-1}
       aria-label={title}
       style={{
         // dnd-kit's own transform, which is already direction-agnostic: it is

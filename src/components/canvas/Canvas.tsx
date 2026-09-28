@@ -54,6 +54,8 @@ export type CanvasProps = {
   onReorder: (from: number, to: number) => void
   onResize: (id: WidgetId, size: { w?: WidgetWidth; h?: WidgetHeight }) => void
   onRemove: (id: WidgetId) => void
+  /** The widget that was just added, if any — focus follows it. */
+  focusWidgetId?: WidgetId | null
 }
 
 export function Canvas({
@@ -63,6 +65,7 @@ export function Canvas({
   onReorder,
   onResize,
   onRemove,
+  focusWidgetId = null,
 }: CanvasProps) {
   const { t } = useI18n()
 
@@ -161,6 +164,7 @@ export function Canvas({
               onMove={(delta) => onMove(item.id, delta)}
               onResize={(size) => onResize(item.id, size)}
               onRemove={() => onRemove(item.id)}
+              shouldFocus={item.id === focusWidgetId}
             />
           ))}
         </div>
