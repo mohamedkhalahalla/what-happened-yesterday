@@ -21,7 +21,8 @@ export const ANCHOR_TODAY_ISO = '2026-09-27'
 /** Length of the data window in Riyadh days. */
 export const DAYS = 90
 
-/** Ramadan 1447 AH, inclusive. Falls fully inside the 90-day window. */
+/** Simulated Ramadan-style month (the brief asks for one). Real Ramadan 1447
+ *  fell in Feb–Mar 2026, outside this data window. */
 export const RAMADAN = { fromISO: '2026-07-24', toISO: '2026-08-22' } as const
 
 /** Relative daily volume by Saudi weekday: Sunday–Thursday work, Friday is quietest. */
