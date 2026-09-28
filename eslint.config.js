@@ -40,7 +40,7 @@ export default tseslint.config(
     },
   },
   {
-    // Guardrail: no browser-local date access anywhere under src/.
+    // Guardrail: no browser-local date access in any of our own code.
     files: ['src/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-properties': [
@@ -63,6 +63,27 @@ export default tseslint.config(
           selector:
             'CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/][arguments.length<2]',
           message: LOCAL_DATE_MESSAGE,
+        },
+      ],
+    },
+  },
+  {
+    // `src/engine/reference.ts` is the slow oracle the engine is tested
+    // against. It is ~100x slower than the real thing, so it must never be
+    // reachable from shipped code — only from tests.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/engine/reference', './reference', '../engine/reference'],
+              message:
+                'reference.ts is the test-only oracle for the engine — import src/engine/aggregate.ts instead.',
+            },
+          ],
         },
       ],
     },
