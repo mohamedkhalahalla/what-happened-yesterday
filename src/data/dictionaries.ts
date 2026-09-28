@@ -250,7 +250,7 @@ export const INTENTS: readonly Intent[] = [
   // Fixed line and retail
   {
     id: 'fiber_installation',
-    labelAr: 'تركيب الألياف البصرية',
+    labelAr: 'تركيب الألياف الضوئية',
     labelEn: 'Fiber installation',
     weight: 25,
     baseResolve: 0.65,
