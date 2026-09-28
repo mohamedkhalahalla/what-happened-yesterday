@@ -24,7 +24,6 @@ export function CanvasToolbar({ present, onAdd, onReset }: CanvasToolbarProps) {
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
 
-  const addRef = useRef<HTMLButtonElement>(null)
   const resetRef = useRef<HTMLButtonElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
 
@@ -34,31 +33,12 @@ export function CanvasToolbar({ present, onAdd, onReset }: CanvasToolbarProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative">
-        <button
-          ref={addRef}
-          type="button"
-          aria-expanded={catalogOpen}
-          onClick={() => setCatalogOpen((open) => !open)}
-          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] font-medium text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          {t('canvas.addWidget')}
-        </button>
-
-        {catalogOpen && (
-          <WidgetCatalog
-            present={present}
-            onAdd={(id) => {
-              setCatalogOpen(false)
-              onAdd(id)
-            }}
-            onClose={() => {
-              setCatalogOpen(false)
-              addRef.current?.focus()
-            }}
-          />
-        )}
-      </div>
+      <WidgetCatalog
+        open={catalogOpen}
+        onOpenChange={setCatalogOpen}
+        present={present}
+        onAdd={onAdd}
+      />
 
       {confirmingReset ? (
         <div

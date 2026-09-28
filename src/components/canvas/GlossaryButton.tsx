@@ -6,12 +6,16 @@
  * the wrong reading is precisely the failure a dashboard exists to prevent, so
  * the definition is one keystroke away from the number rather than in a wiki
  * nobody opens.
+ *
+ * `bottom-end` for the same reason as the ⋮ menu beside it: both sit at the
+ * header's inline end, so both must open inward.
  */
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { useI18n } from '../../i18n/useI18n'
 import { termsFor, type GlossaryTermId } from '../../widgets/glossary'
+import { Popover } from '../Popover'
 
 export type GlossaryButtonProps = {
   title: string
@@ -22,70 +26,40 @@ export function GlossaryButton({ title, terms }: GlossaryButtonProps) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
 
-  const panelId = useId()
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      setOpen(false)
-      triggerRef.current?.focus()
-    }
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target as Node
-      if (panelRef.current?.contains(target) === true) return
-      if (triggerRef.current?.contains(target) === true) return
-      setOpen(false)
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [open])
-
   if (terms.length === 0) return null
 
   return (
-    <div className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={t('widget.glossaryFor', { title })}
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="rounded-full px-1.5 py-1 text-[12px] leading-none text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        <span aria-hidden>ⓘ</span>
-      </button>
-
-      {open && (
-        <div
-          ref={panelRef}
-          id={panelId}
-          className="absolute z-30 mt-1 max-h-72 w-72 overflow-auto rounded-lg border border-border bg-card p-3 shadow-card-hover"
-          onPointerDown={(event) => event.stopPropagation()}
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      placement="bottom-end"
+      panelClassName="w-72 p-3"
+      // Definitions are not interactive, so focus goes to the panel itself
+      // rather than hunting for a tabbable that does not exist.
+      initialFocus={-1}
+      renderTrigger={({ ref, props }) => (
+        <button
+          ref={ref}
+          type="button"
+          aria-label={t('widget.glossaryFor', { title })}
+          className="rounded-full px-1.5 py-1 text-[12px] leading-none text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          {...props}
         >
-          <h3 className="text-[12px] font-semibold text-card-foreground">{t('widget.glossary')}</h3>
-          <dl className="mt-2 space-y-2">
-            {termsFor(terms).map((term) => (
-              <div key={term.id}>
-                <dt className="text-[12px] font-medium text-foreground">{t(term.termKey)}</dt>
-                <dd className="text-[11.5px] leading-[1.5] text-muted-foreground">
-                  {t(term.definitionKey)}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+          <span aria-hidden>ⓘ</span>
+        </button>
       )}
-    </div>
+    >
+      <h3 className="text-[12px] font-semibold text-card-foreground">{t('widget.glossary')}</h3>
+      <dl className="mt-2 space-y-2">
+        {termsFor(terms).map((term) => (
+          <div key={term.id}>
+            <dt className="text-[12px] font-medium text-foreground">{t(term.termKey)}</dt>
+            <dd className="text-[11.5px] leading-[1.5] text-muted-foreground">
+              {t(term.definitionKey)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Popover>
   )
 }
