@@ -38,6 +38,45 @@ export const en = {
   'state.error': 'Could not load this',
   'state.retry': 'Try again',
 
+  'filters.preset.lastWeek': 'Last week',
+  'filters.preset.last7Days': 'Last 7 days',
+  'filters.preset.last30Days': 'Last 30 days',
+  'filters.preset.quarter': 'Whole quarter',
+  'filters.preset.custom': 'Custom',
+  'filters.presetsLegend': 'Date range',
+  'filters.from': 'From',
+  'filters.to': 'To',
+
+  'filters.agents': 'Agents',
+  'filters.intents': 'Intents',
+  'filters.languages': 'Languages',
+  'filters.allOf': 'All {dimension}',
+  'filters.nSelected': '{count} selected',
+  'filters.selectAll': 'Select all',
+  'filters.clear': 'Clear',
+  'filters.clearAll': 'Clear all',
+  'filters.searchIntents': 'Search intents',
+  'filters.noMatches': 'No matches',
+  'filters.activeFilters': 'Active filters',
+  'filters.remove': 'Remove {label}',
+
+  'filters.compare': 'Compare with previous period',
+  'filters.comparing': 'Comparing {current} with {previous}',
+  'filters.comparisonOff': 'Showing {current} without a comparison',
+  'filters.noComparison': 'No comparison data',
+  'filters.noComparisonWhy': 'The period before {current} is outside this dataset.',
+  'filters.partialComparison': 'Partial comparison',
+  'filters.partialComparisonWhy': 'Only part of {previous} is in this dataset.',
+
+  'filters.correctedNotice': 'Some link filters were invalid and were reset',
+  'filters.dismiss': 'Dismiss',
+
+  'state.updating': 'Updating…',
+
+  'kpi.deltaIncreased': 'increased by {delta}',
+  'kpi.deltaDecreased': 'decreased by {delta}',
+  'kpi.deltaUnchanged': 'unchanged',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

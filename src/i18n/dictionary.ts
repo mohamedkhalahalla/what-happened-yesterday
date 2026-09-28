@@ -12,6 +12,8 @@ import {
   HANDOFF_LABELS,
   HANDOFF_REASONS,
   INTENTS,
+  LANGUAGES,
+  LANGUAGE_LABELS,
   OUTCOMES,
   OUTCOME_LABELS,
 } from '../data/dictionaries'
@@ -46,4 +48,11 @@ export function handoffLabel(lang: UiLang, code: number): string {
   const id = HANDOFF_REASONS[code]
   if (id === undefined) return UNKNOWN
   return HANDOFF_LABELS[id][lang]
+}
+
+/** Display label for a language code. */
+export function languageLabel(lang: UiLang, code: number): string {
+  const id = LANGUAGES[code]
+  if (id === undefined) return UNKNOWN
+  return LANGUAGE_LABELS[id][lang]
 }

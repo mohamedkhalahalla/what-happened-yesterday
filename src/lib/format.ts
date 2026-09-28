@@ -186,6 +186,22 @@ export function formatSignedInt(lang: UiLang, value: number): string {
   )
 }
 
+/**
+ * The size of a points change, without a sign: `0.4 pts` / `0.4 نقطة`.
+ *
+ * For accessible names that already say the direction in words. "decreased by
+ * -0.1 pts" states the negative twice; "decreased by 0.1 pts" is what a person
+ * would say.
+ */
+export function formatPointsMagnitude(lang: UiLang, deltaRatio: number): string {
+  const points = numberFormat(lang, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Math.abs(deltaRatio) * 100)
+
+  return isolate(`${points}${NBSP}${lang === 'ar' ? 'نقطة' : 'pts'}`)
+}
+
 /** One value with a localized unit, e.g. `3 mins` / `3 د`. */
 function formatUnit(lang: UiLang, value: number, unit: 'second' | 'minute' | 'hour'): string {
   return numberFormat(lang, { style: 'unit', unit, unitDisplay: 'short' }).format(value)

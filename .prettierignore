@@ -2,3 +2,5 @@ dist
 coverage
 node_modules
 package-lock.json
+# Placeholders for folders that are still empty; Prettier has no parser for them.
+**/.gitkeep

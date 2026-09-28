@@ -36,8 +36,13 @@ export type KpiCardProps = {
   label: string
   /** Already formatted — the card does not know if this is a rate or a count. */
   value: string
-  /** Formatted delta, e.g. from `formatPointsDelta`. */
+  /** Formatted delta, e.g. from `formatPointsDelta`. Carries its own sign. */
   delta?: string
+  /**
+   * The same change without a sign, for the spoken name. Falls back to
+   * `delta`, but "decreased by -0.1 pts" says the negative twice.
+   */
+  deltaMagnitude?: string
   /** Whether this movement is good news. Not inferable from the sign. */
   deltaTone?: DeltaTone
   /** Raw direction for the glyph: positive, negative or flat. */
@@ -62,12 +67,28 @@ export function KpiCard({
   label,
   value,
   delta,
+  deltaMagnitude,
   deltaTone = 'neutral',
   deltaDirection = 0,
   footnote,
   loading = false,
 }: KpiCardProps) {
   const { t } = useI18n()
+
+  /**
+   * The direction stated in words, in the current language: "decreased by
+   * 0.1 points". Screen readers get this instead of the glyph and the bare
+   * number, so the meaning does not depend on seeing which way a triangle
+   * points -- or on the CSS that might have rotated it.
+   */
+  const directionWords =
+    delta === undefined
+      ? ''
+      : deltaDirection > 0
+        ? t('kpi.deltaIncreased', { delta: deltaMagnitude ?? delta })
+        : deltaDirection < 0
+          ? t('kpi.deltaDecreased', { delta: deltaMagnitude ?? delta })
+          : t('kpi.deltaUnchanged')
 
   if (loading) {
     return (
@@ -94,12 +115,20 @@ export function KpiCard({
 
       {delta !== undefined && (
         <div className={`mt-2.5 text-[12.5px] font-medium ${DELTA_COLOR[deltaTone]}`}>
-          {/* Glyph as well as colour: direction must survive greyscale and
-              colour-vision deficiency. */}
+          {/*
+            The glyph is a redundant visual encoding of direction, so that
+            direction survives greyscale and colour-vision deficiency. It is
+            hidden from assistive tech, which gets the direction as a word
+            instead: a rotated triangle has no accessible name, and reading out
+            "black up-pointing triangle" would be worse than reading nothing.
+          */}
           <span className="text-[9px] leading-none" aria-hidden>
             {directionGlyph(deltaDirection)}
           </span>{' '}
-          <Num>{delta}</Num>{' '}
+          <span className="sr-only-text">{directionWords}</span>
+          <span aria-hidden>
+            <Num>{delta}</Num>{' '}
+          </span>
           <span className="font-normal text-muted-foreground">{t('kpi.vsPrevious')}</span>
         </div>
       )}
