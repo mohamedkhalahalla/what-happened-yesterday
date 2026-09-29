@@ -53,6 +53,18 @@ const FORMATTING_VIOLATIONS = [
   },
 ]
 
+const GROUND_TRUTH_MESSAGE =
+  'STORY and story.ts say where the anomalies are planted. The dashboard has to find them in the data — only src/data/generate.ts and tests may read them.'
+
+/** Applied everywhere in src/, including the generator itself. */
+const RESTRICTED_IMPORT_PATTERNS = [
+  {
+    group: ['**/engine/reference', './reference', '../engine/reference'],
+    message:
+      'reference.ts is the test-only oracle for the engine — import src/engine/aggregate.ts instead.',
+  },
+]
+
 export default tseslint.config(
   { ignores: ['dist', 'coverage', 'node_modules'] },
   {
@@ -120,24 +132,56 @@ export default tseslint.config(
     },
   },
   {
-    // `src/engine/reference.ts` is the slow oracle the engine is tested
-    // against. It is ~100x slower than the real thing, so it must never be
-    // reachable from shipped code — only from tests.
-    files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.test.ts'],
+    /*
+     * Two things shipped code may not import.
+     *
+     * `src/engine/reference.ts` is the slow oracle the engine is tested
+     * against — ~100x slower than the real thing, so it must never be
+     * reachable from the app.
+     *
+     * `STORY` and `src/data/story.ts` are the **ground truth**: where the
+     * three anomalies are planted. The entire premise of this dashboard is
+     * that it finds them from the numbers, the way a director would. A widget
+     * that imported the answer key would still render something plausible,
+     * and every claim the project makes would quietly become false — so this
+     * is the one guardrail whose absence would not show up as a bug.
+     *
+     * Tests read both, which is what a ground-truth file is for.
+     */
+    files: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
+            ...RESTRICTED_IMPORT_PATTERNS,
             {
-              group: ['**/engine/reference', './reference', '../engine/reference'],
-              message:
-                'reference.ts is the test-only oracle for the engine — import src/engine/aggregate.ts instead.',
+              group: ['**/data/story', './story', '../data/story', '../../data/story'],
+              message: GROUND_TRUTH_MESSAGE,
+            },
+            {
+              group: ['**/data/config', './config', '../data/config', '../../data/config'],
+              importNames: ['STORY'],
+              message: GROUND_TRUTH_MESSAGE,
             },
           ],
         },
       ],
+    },
+  },
+  {
+    /*
+     * The two modules that plant the anomalies, and so must know where they
+     * go. Named individually rather than exempted by directory: this list is
+     * the definition of "the generator", and adding to it should feel like a
+     * decision.
+     *
+     * They are still held to the reference.ts ban.
+     */
+    files: ['src/data/generate.ts', 'src/data/story.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: RESTRICTED_IMPORT_PATTERNS }],
     },
   },
   prettier,
