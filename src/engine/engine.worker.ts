@@ -15,6 +15,7 @@ import * as Comlink from 'comlink'
 import { generateDataset } from '../data/generate'
 import type { Dataset } from '../data/types'
 import { aggregate, drill } from './aggregate'
+import { sortRows, type SortDirection, type SortKey, type SortRanks } from './sort'
 import type { Aggregates, DrillTarget, Query } from './types'
 
 /** Result of a worker call, with the time the worker itself spent on it. */
@@ -60,6 +61,26 @@ const api = {
     // Row lists can be six figures long; hand the buffer over instead of
     // copying it. Safe because `drill` allocates a fresh array every call.
     return Comlink.transfer({ rows, ms }, [rows.buffer])
+  },
+
+  /**
+   * Reorder a row list. The caller supplies localized ranks for the code
+   * columns — see sort.ts for why the worker cannot work them out itself.
+   *
+   * `rows` arrives transferred, so the caller must not touch it afterwards;
+   * the sorted array is transferred back.
+   */
+  sort(
+    rows: Uint32Array,
+    key: SortKey,
+    direction: SortDirection,
+    ranks: SortRanks,
+  ): Timed<{ rows: Uint32Array }> {
+    const ds = requireDataset()
+    const startedAt = performance.now()
+    const sorted = sortRows(ds, rows, key, direction, ranks)
+
+    return Comlink.transfer({ rows: sorted, ms: performance.now() - startedAt }, [sorted.buffer])
   },
 }
 

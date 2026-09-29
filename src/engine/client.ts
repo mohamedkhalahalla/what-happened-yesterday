@@ -15,6 +15,7 @@ import * as Comlink from 'comlink'
 
 import type { Dataset } from '../data/types'
 import type { EngineApi } from './engine.worker'
+import type { SortDirection, SortKey, SortRanks } from './sort'
 import type { Aggregates, DrillTarget, Query } from './types'
 
 /** Returned in place of a result when a newer request has already been made. */
@@ -40,6 +41,8 @@ export type DrillResult =
       roundTripMs: number
     }
 
+export type SortResult = DrillResult
+
 export function isStale(result: { stale: boolean }): result is Stale {
   return result.stale
 }
@@ -51,6 +54,7 @@ export class EngineClient {
   // One ticket counter per request kind; only the newest ticket is honoured.
   private latestAggregate = 0
   private latestDrill = 0
+  private latestSort = 0
 
   constructor() {
     this.worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' })
@@ -85,6 +89,33 @@ export class EngineClient {
 
     if (ticket !== this.latestDrill) return { stale: true }
     return { stale: false, rows, workerMs: ms, roundTripMs }
+  }
+
+  /**
+   * Reorder a row list in the worker.
+   *
+   * `rows` is transferred, so it is detached here the moment this is called —
+   * callers hold the result, never the input.
+   */
+  async sort(
+    rows: Uint32Array,
+    key: SortKey,
+    direction: SortDirection,
+    ranks: SortRanks,
+  ): Promise<SortResult> {
+    const ticket = ++this.latestSort
+    const startedAt = performance.now()
+
+    const response = await this.api.sort(
+      Comlink.transfer(rows, [rows.buffer]),
+      key,
+      direction,
+      ranks,
+    )
+    const roundTripMs = performance.now() - startedAt
+
+    if (ticket !== this.latestSort) return { stale: true }
+    return { stale: false, rows: response.rows, workerMs: response.ms, roundTripMs }
   }
 
   /** Tear the worker down. In-flight calls never resolve after this. */

@@ -17,6 +17,7 @@ import { generateDataset } from '../src/data/generate'
 import { getCall } from '../src/data/getCall'
 import type { Call, Dataset } from '../src/data/types'
 import { aggregate, drill } from '../src/engine/aggregate'
+import { sortRows, type SortKey } from '../src/engine/sort'
 import type { Counts, DrillTarget, Query } from '../src/engine/types'
 
 const WARMUP_RUNS = 5
@@ -227,6 +228,41 @@ function main(): void {
     )
   }
 
+  // --- sorting all 200k rows ------------------------------------------------
+  const allRows = drill(
+    ds,
+    {
+      range: { from: day('2026-06-29'), to: day('2026-09-26') },
+      compare: null,
+      agents: [],
+      intents: [],
+      languages: [],
+    },
+    { period: 'current' },
+  )
+
+  // Agents ranked by display name, as the main thread would send them.
+  const agentRanks = (() => {
+    const order = AGENTS.map((agent, code) => ({ name: agent.nameEn, code }))
+    order.sort((a, b) => a.name.localeCompare(b.name))
+    const ranks = new Array<number>(AGENTS.length)
+    order.forEach(({ code }, position) => {
+      ranks[code] = position
+    })
+    return ranks
+  })()
+
+  const sortBenchRows: string[] = []
+  for (const [name, key] of [
+    ['Sort 200k by duration', 'duration'],
+    ['Sort 200k by agent (localized rank)', 'agent'],
+  ] as [string, SortKey][]) {
+    const stats = measure(() => void sortRows(ds, allRows, key, 'desc', { agents: agentRanks }))
+    sortBenchRows.push(
+      `| ${name} | ${thousands(allRows.length)} | ${fmt(stats.medianMs)} | ${fmt(stats.p95Ms)} |`,
+    )
+  }
+
   const report = [
     '',
     '## Benchmark',
@@ -252,6 +288,16 @@ function main(): void {
     '| Target | Rows | Median | p95 |',
     '| --- | ---: | ---: | ---: |',
     ...drillRows,
+    '',
+    '### Sorting',
+    '',
+    'Runs in the worker, so the UI thread stays free while a 200k-row list is',
+    'reordered. Agent and intent sort by localized display rank, supplied by the',
+    'main thread.',
+    '',
+    '| Sort | Rows | Median | p95 |',
+    '| --- | ---: | ---: | ---: |',
+    ...sortBenchRows,
     '',
   ].join('\n')
 
