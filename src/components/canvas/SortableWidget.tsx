@@ -91,7 +91,15 @@ export function SortableWidget({
         gridRow: `span ${HEIGHT_ROWS[item.h]}`,
         zIndex: isDragging ? 10 : undefined,
       }}
-      className={`col-span-12 flex flex-col rounded-lg border border-border bg-card shadow-card md:[grid-column:span_var(--widget-span)] ${
+      /*
+       * `min-w-0` is load-bearing. A grid item's default `min-width: auto`
+       * refuses to shrink below its content's minimum, so one widget holding
+       * a wide table made the *page* 685px wide inside a 390px phone — the
+       * widget's own `overflow-auto` never got a chance, because the widget
+       * itself had been stretched. With the floor removed the widget takes
+       * the column it was given and the table scrolls inside it.
+       */
+      className={`col-span-12 flex min-w-0 flex-col rounded-lg border border-border bg-card shadow-card md:[grid-column:span_var(--widget-span)] ${
         isDragging ? 'opacity-60 shadow-card-hover' : ''
       }`}
     >
@@ -130,7 +138,16 @@ export function SortableWidget({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      {/*
+        `relative` alongside `overflow-auto`, because a scroll container that
+        is not a containing block does not actually contain anything that is
+        positioned. Visually-hidden text is `position: absolute`; inside a
+        table scrolled sideways, with nothing positioned between it and the
+        page, its containing block was the viewport — so it sat at the
+        column's x offset, escaped the scroller, and made the whole document
+        123px wider than the phone showing it.
+      */}
+      <div className="relative min-h-0 flex-1 overflow-auto p-4">
         <Body {...widgetProps} />
       </div>
     </section>

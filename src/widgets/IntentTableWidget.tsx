@@ -144,7 +144,9 @@ export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetPr
   }
 
   return (
-    <div className="h-full overflow-auto">
+    // `relative` so anything positioned inside is clipped by this scroller
+    // rather than by the page. See SortableWidget's body for what that cost.
+    <div className="relative h-full overflow-auto">
       <table className="w-full border-collapse text-[11.5px]">
         <caption className="sr-only-text">{t('intents.caption')}</caption>
         <thead>
