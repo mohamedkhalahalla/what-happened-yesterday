@@ -66,15 +66,22 @@ function Filtered({
   dataset,
   bounds,
   userId,
-  seed,
+  dataGeneration,
   seedInvalid,
 }: {
   client: EngineClient | null
   dataset: Dataset | null
   bounds: DataBounds
   userId: UserId
-  /** Which synthetic quarter these aggregates must be computed from. */
-  seed: number
+  /**
+   * Counts the datasets the worker has actually delivered.
+   *
+   * Not the seed. The seed changes the instant the URL does, which is *before*
+   * the worker holds that quarter — keying the aggregates on it made them
+   * refetch too early, against the dataset being replaced, and never again
+   * afterwards. This changes when the new data has arrived.
+   */
+  dataGeneration: number
   /** The URL named a seed that could not be read; say so in the one notice. */
   seedInvalid: boolean
 }) {
@@ -84,7 +91,7 @@ function Filtered({
     client,
     state,
     bounds,
-    seed,
+    dataGeneration,
   )
   const {
     layout,
@@ -322,7 +329,7 @@ function Shell({
             dataset={seed.dataset}
             bounds={seed.bounds}
             userId={currentUser}
-            seed={seed.seed}
+            dataGeneration={seed.generation}
             seedInvalid={seed.invalid}
           />
         )}

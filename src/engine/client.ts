@@ -9,6 +9,20 @@
  *
  * `aggregate` and `drill` keep separate tickets: a drill-down finishing does
  * not invalidate the KPI numbers on screen, and vice versa.
+ *
+ * ## Latest-wins has to span `init`
+ *
+ * Tickets alone were not enough, and the gap shipped a bug. Replacing the
+ * dataset is also a kind of "newer request": a query issued a moment before
+ * `init` is answered from the quarter that is being thrown away, and by its own
+ * ticket it is the newest query there is — so it was accepted, and the
+ * dashboard showed one quarter's numbers under another quarter's URL.
+ *
+ * So every call also records the **generation** of the dataset it was issued
+ * against, and a response whose generation has since been replaced is stale
+ * whatever its ticket says. Note that a query posted *after* `init` is safe
+ * without any of this: the worker processes messages in order, so it is
+ * answered from the new dataset.
  */
 
 import * as Comlink from 'comlink'
@@ -56,38 +70,53 @@ export class EngineClient {
   private latestDrill = 0
   private latestSort = 0
 
+  /**
+   * Which dataset the worker holds, counting from the first `init`.
+   *
+   * Incremented when a new one is *requested*, not when it arrives: the point
+   * is to invalidate everything already in flight against the old one.
+   */
+  private generation = 0
+
   constructor() {
     this.worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' })
     this.api = Comlink.wrap<EngineApi>(this.worker)
   }
 
   /**
-   * Build the dataset in the worker and get the main thread's own copy of it.
-   * Not latest-wins: it is called once, and everything else depends on it.
+   * Build a dataset in the worker and get the main thread's own copy of it.
+   *
+   * Every call bumps the generation, which strands every query already in
+   * flight — see the note at the top of this file. Callers still need their
+   * own guard for two inits racing each other; this one is about everything
+   * else the worker was in the middle of.
    */
   async init(seed?: number): Promise<Dataset> {
+    this.generation++
     return await this.api.init(seed)
   }
 
   async aggregate(query: Query): Promise<AggregateResult> {
     const ticket = ++this.latestAggregate
+    const generation = this.generation
     const startedAt = performance.now()
 
     const { result, ms } = await this.api.aggregate(query)
     const roundTripMs = performance.now() - startedAt
 
-    if (ticket !== this.latestAggregate) return { stale: true }
+    if (ticket !== this.latestAggregate || generation !== this.generation) return { stale: true }
     return { stale: false, result, workerMs: ms, roundTripMs }
   }
 
   async drill(query: Query, target: DrillTarget): Promise<DrillResult> {
     const ticket = ++this.latestDrill
+    const generation = this.generation
     const startedAt = performance.now()
 
     const { rows, ms } = await this.api.drill(query, target)
     const roundTripMs = performance.now() - startedAt
 
-    if (ticket !== this.latestDrill) return { stale: true }
+    if (ticket !== this.latestDrill || generation !== this.generation) return { stale: true }
     return { stale: false, rows, workerMs: ms, roundTripMs }
   }
 
@@ -104,6 +133,7 @@ export class EngineClient {
     ranks: SortRanks,
   ): Promise<SortResult> {
     const ticket = ++this.latestSort
+    const generation = this.generation
     const startedAt = performance.now()
 
     const response = await this.api.sort(
@@ -114,7 +144,7 @@ export class EngineClient {
     )
     const roundTripMs = performance.now() - startedAt
 
-    if (ticket !== this.latestSort) return { stale: true }
+    if (ticket !== this.latestSort || generation !== this.generation) return { stale: true }
     return { stale: false, rows: response.rows, workerMs: response.ms, roundTripMs }
   }
 
