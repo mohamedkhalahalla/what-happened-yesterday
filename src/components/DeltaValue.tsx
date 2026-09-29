@@ -9,34 +9,45 @@
  *
  * So two things happen here. Non-notable changes are **muted**, which sorts a
  * table of forty numbers into "look at these" and "these are weather" without
- * anyone reading a single one. And every delta can explain itself on hover or
- * focus: "Normal variation here: ±1.4 pts. Changes are flagged when they
- * exceed this and are at least 3 pts."
+ * anyone reading a single one. And every delta carries its own explanation:
+ * "Normal variation here: ±1.4 pts. Changes are flagged when they exceed this
+ * and are at least 3 pts."
  *
  * Muting is `--color-muted-foreground`, which was checked at 4.54:1 against
  * the muted surface — quiet, still AA. The visual state is backed by hidden
  * text saying "within normal variation", because a colour difference is not a
  * fact a screen reader can report.
  *
- * The tooltip follows WCAG 1.4.13: Escape dismisses it, the pointer can move
- * into it, and it stays until focus or hover leaves rather than timing out.
+ * ## Why this is not focusable
+ *
+ * It was, briefly, so the tooltip could be opened by keyboard. That put a tab
+ * stop on every delta in the Intents table — about fifty extra stops in one
+ * widget, so reaching the row below meant pressing Tab past two numbers that
+ * only ever showed a sentence. A keyboard user paid for a convenience aimed
+ * at mouse users.
+ *
+ * The explanation is now *in the DOM* as visually hidden text, which a screen
+ * reader reads in document order with the number it belongs to — no
+ * navigation, no discovery problem, and strictly more information than a
+ * tooltip nobody found. The tooltip remains for pointer users, who lose
+ * nothing, and the column header carries one focusable ⓘ stating the rule once
+ * for everyone else.
  */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import {
   FloatingPortal,
   autoUpdate,
   flip,
   offset,
+  safePolygon,
   shift,
   useDismiss,
   useFloating,
-  useFocus,
   useHover,
   useInteractions,
   useRole,
-  safePolygon,
 } from '@floating-ui/react'
 
 import { useI18n } from '../i18n/useI18n'
@@ -49,23 +60,28 @@ export type DeltaValueProps = {
   children: ReactNode
   /** Extra classes applied when the change *is* notable (tone colour). */
   notableClassName?: string
-  /**
-   * True when this sits inside something already focusable (a table cell in a
-   * row button, say). The trigger is then a plain span rather than adding a
-   * second tab stop for the same information.
-   */
-  insideFocusable?: boolean
+}
+
+/** The sentence describing this row's noise floor, for hidden text and tooltip. */
+export function useDeltaExplanation(comparison: Comparison): string {
+  const { lang, t } = useI18n()
+
+  if (comparison.verdict === 'insufficient') return t('delta.tooltipInsufficient')
+
+  return t('delta.tooltip', {
+    range: formatDecimal(lang, comparison.normalRange * 100),
+    threshold: formatDecimal(lang, comparison.minEffect * 100, 0),
+  })
 }
 
 export function DeltaValue({
   comparison,
   children,
   notableClassName = 'text-foreground',
-  insideFocusable = false,
 }: DeltaValueProps) {
-  const { lang, t } = useI18n()
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const describedBy = useId()
+  const explanation = useDeltaExplanation(comparison)
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -77,10 +93,10 @@ export function DeltaValue({
   })
 
   const interactions = useInteractions([
-    // safePolygon keeps the tooltip open while the pointer travels to it,
-    // which is the "hoverable" half of WCAG 1.4.13.
+    // Pointer only. safePolygon keeps it open while the pointer travels to it,
+    // and Escape still dismisses — the hoverable and dismissible halves of
+    // WCAG 1.4.13. The persistent half is moot with no focus trigger.
     useHover(context, { handleClose: safePolygon(), delay: { open: 150, close: 0 } }),
-    useFocus(context),
     useDismiss(context, { escapeKey: true }),
     useRole(context, { role: 'tooltip' }),
   ])
@@ -88,40 +104,38 @@ export function DeltaValue({
   const notable = comparison.verdict === 'notable'
   const insufficient = comparison.verdict === 'insufficient'
 
-  const explanation = insufficient
-    ? t('delta.tooltipInsufficient')
-    : t('delta.tooltip', {
-        range: formatDecimal(lang, comparison.normalRange * 100),
-        threshold: formatDecimal(lang, comparison.minEffect * 100, 0),
-      })
-
   const { setReference, setFloating } = refs
 
   return (
     <>
       <span
         ref={setReference}
-        // Only add a tab stop when there is not already one wrapping this.
-        tabIndex={insideFocusable ? undefined : 0}
-        aria-describedby={open ? describedBy : undefined}
-        className={`inline-flex items-baseline gap-1 rounded-sm ${
+        className={`inline-flex items-baseline gap-1 ${
           notable ? notableClassName : 'text-muted-foreground'
-        } ${insideFocusable ? '' : 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'}`}
+        }`}
         {...interactions.getReferenceProps()}
       >
         {children}
-        {/* The visual mute is a colour; this is the same fact in words. */}
-        {!notable && !insufficient && (
-          <span className="sr-only-text">{t('delta.withinNormal')}</span>
-        )}
+        {/*
+          Everything a pointer user gets from hovering, in document order, for
+          everyone who is not pointing at anything. The muting is a colour, so
+          it is restated in words; the noise floor is otherwise only in a
+          tooltip that never opens without a pointer.
+        */}
+        <span className="sr-only-text">
+          {!notable && !insufficient ? `${t('delta.withinNormal')}. ` : ''}
+          {explanation}
+        </span>
       </span>
 
       {open && (
         <FloatingPortal>
           <div
             ref={setFloating}
-            id={describedBy}
             style={floatingStyles}
+            // aria-hidden: the same sentence is already in the DOM above, and
+            // announcing it twice is worse than not announcing it at all.
+            aria-hidden
             className="z-50 max-w-64 rounded-md border border-border bg-card px-2.5 py-1.5 text-[11.5px] leading-[1.5] text-card-foreground shadow-card-hover"
             {...interactions.getFloatingProps()}
           >

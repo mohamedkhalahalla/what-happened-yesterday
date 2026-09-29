@@ -265,6 +265,8 @@ export const ar: Record<MessageKey, string> = {
 
   'widget.tooShort': 'قصير جدًا لعرض هذا الرسم',
 
+  'intents.aboutColumn': 'عن عمود {column}',
+
   'perf.readout':
     'احتُسبت خلال {worker} مللي ثانية (العامل) · {roundTrip} مللي ثانية ذهابًا وإيابًا',
 }

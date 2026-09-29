@@ -162,7 +162,7 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
                 <span className="flex shrink-0 items-baseline gap-2">
                   {showDelta && (
                     <span className="tabular-nums">
-                      <DeltaValue comparison={row.delta} insideFocusable>
+                      <DeltaValue comparison={row.delta}>
                         {formatPointsDelta(lang, row.delta.delta)}
                         {/*
                           A badge only when a reason got notably *worse*. A

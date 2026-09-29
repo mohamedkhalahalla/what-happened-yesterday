@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from 'react'
 
+import { ColumnInfo } from '../components/ColumnInfo'
 import { DeltaValue } from '../components/DeltaValue'
 import { intentLabel } from '../i18n/dictionary'
 import { useI18n } from '../i18n/useI18n'
@@ -32,13 +33,19 @@ const COLUMNS: {
   key: IntentSortKey
   labelKey: Parameters<ReturnType<typeof useI18n>['t']>[0]
   numeric: boolean
+  /**
+   * True for the two columns whose values are judged against a noise floor.
+   * Their header carries a single ⓘ explaining the rule, which is what
+   * replaced a focusable tooltip on every one of their cells.
+   */
+  explainsFlagging?: boolean
 }[] = [
   { key: 'intent', labelKey: 'intents.col.intent', numeric: false },
   { key: 'calls', labelKey: 'intents.col.calls', numeric: true },
   { key: 'resolution', labelKey: 'intents.col.resolution', numeric: true },
-  { key: 'delta', labelKey: 'intents.col.delta', numeric: true },
+  { key: 'delta', labelKey: 'intents.col.delta', numeric: true, explainsFlagging: true },
   { key: 'unresolved', labelKey: 'intents.col.unresolved', numeric: true },
-  { key: 'quarter', labelKey: 'intents.col.quarter', numeric: true },
+  { key: 'quarter', labelKey: 'intents.col.quarter', numeric: true, explainsFlagging: true },
 ]
 
 export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetProps) {
@@ -113,17 +120,25 @@ export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetPr
           column.numeric ? 'text-end' : 'text-start'
         }`}
       >
-        <button
-          type="button"
-          onClick={() => toggleSort(column.key)}
-          aria-label={t('intents.sortBy', { column: t(column.labelKey) })}
-          className="inline-flex items-center gap-1 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <span>{t(column.labelKey)}</span>
-          <span aria-hidden className="text-[9px]">
-            {active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}
-          </span>
-        </button>
+        <span className="inline-flex items-center">
+          <button
+            type="button"
+            onClick={() => toggleSort(column.key)}
+            aria-label={t('intents.sortBy', { column: t(column.labelKey) })}
+            className="inline-flex items-center gap-1 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <span>{t(column.labelKey)}</span>
+            <span aria-hidden className="text-[9px]">
+              {active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}
+            </span>
+          </button>
+
+          {column.explainsFlagging === true && (
+            <ColumnInfo label={t('intents.aboutColumn', { column: t(column.labelKey) })}>
+              {t('glossary.whyFlagged.def')}
+            </ColumnInfo>
+          )}
+        </span>
       </th>
     )
   }

@@ -274,6 +274,8 @@ export const en = {
 
   'widget.tooShort': 'Too short to show this chart',
 
+  'intents.aboutColumn': 'About the {column} column',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 
