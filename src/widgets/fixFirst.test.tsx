@@ -118,7 +118,13 @@ describe('Fix first', () => {
     expect(text).toContain(`${INTENTS.find((i) => i.id === 'roaming')!.labelEn} has been getting`)
     expect(text).toContain('46.9% in the last four weeks, 68.7% in the first four')
 
-    expect(text).toContain('tool errors 4.7× normal')
+    /*
+     * 4.6x, not the 4.7x this said when incident baselines came from a window
+     * of neighbouring weeks. The baseline is now the fitted quarter trend plus
+     * the median residual of that weekday, which moves the "normal Tuesday" it
+     * is measured against by a tenth of a point.
+     */
+    expect(text).toContain('tool errors 4.6× normal')
     expect(text).toContain('No similar day in the 32 days since.')
   })
 

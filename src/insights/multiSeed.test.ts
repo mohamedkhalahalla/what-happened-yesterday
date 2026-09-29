@@ -178,6 +178,45 @@ describe('RECALL across seeds', () => {
   })
 })
 
+describe('the edges of the quarter', () => {
+  /**
+   * Seed 10 plants its deploy on Thursday 2026-09-24 — the last working day
+   * in the data, inside the week the dashboard opens on.
+   *
+   * This is the regression test for the blind spot. Baselines used to come
+   * from a symmetric window of neighbouring weeks, which cannot exist at the
+   * ends of the data, so the last fortnight went unjudged: the detector was
+   * silent about exactly the period the product exists to explain. The plan
+   * only ever planted deploys in offsets 14–83, so no test ever asked.
+   */
+  const LAST_WORKDAY_SEED = 10
+
+  it('finds an incident on the last working day, in the default view', () => {
+    const plan = storyFor(LAST_WORKDAY_SEED)
+    expect(dayIndexToISO(plan.deployDay), 'fixture seed').toBe('2026-09-24')
+
+    const { insights, found, bounds } = runPlanted(LAST_WORKDAY_SEED)
+
+    // Genuinely inside the selected week, not merely inside the dataset.
+    const range = defaultRange(bounds)
+    expect(plan.deployDay).toBeGreaterThanOrEqual(range.from)
+    expect(plan.deployDay).toBeLessThanOrEqual(range.to)
+
+    expect(found.incidentDays, report(LAST_WORKDAY_SEED, plan, found, insights)).toEqual([
+      '2026-09-24',
+    ])
+  })
+
+  it('still finds the agent and the intent in that quarter', () => {
+    // The edge case must not be bought with the ordinary ones.
+    const { plan, insights, found } = runPlanted(LAST_WORKDAY_SEED)
+    const why = report(LAST_WORKDAY_SEED, plan, found, insights)
+
+    expect(found.agents, why).toEqual([AGENTS[plan.agent]!.id])
+    expect(found.intents, why).toEqual([INTENTS[plan.intent]!.id])
+  })
+})
+
 /*
  * Precision is measured, not asserted, and it lives in `falseAlarm.test.ts`.
  *

@@ -39,7 +39,6 @@ import { prepareDaily, type DailyPoint } from '../widgets/dailyTrendData'
 import { compareRates, type Comparison } from '../lib/stats'
 import {
   AGENT_OUTLIER_RATIO,
-  INCIDENT_BASELINE_WEEKS,
   INCIDENT_MIN_BASELINE_DAYS,
   INCIDENT_MIN_DAY_CALLS,
   INCIDENT_RESOLUTION_MIN_POINTS,
@@ -50,6 +49,7 @@ import {
   pointsToRatio,
 } from '../lib/thresholds'
 import { weekday, type DayRange } from '../lib/time/riyadh'
+import { theilSen, trendAt, type LinearTrend, type TrendPoint } from './trend'
 import type { DrillRequest } from '../state/drill'
 import { rangeLengthOf, type DataBounds } from '../state/presets'
 
@@ -360,92 +360,141 @@ type DayJudgement = {
   resolutionZ: number
 }
 
+/** One metric of a day, or `undefined` where the day has no rate for it. */
+type MetricPick = (point: DailyPoint) => number | undefined
+
 /**
- * The days one day is judged against: **the same weekday, symmetrically, near
- * by**.
+ * The quarter's drift in one metric, fitted on **weekly** rates.
  *
- * Three properties, each load-bearing:
+ * Weekly rather than daily because the weekday rhythm is the larger pattern —
+ * a fit over days would spend Theil–Sen's robustness on Fridays instead of on
+ * the drift. Call-weighted within each week, so a quiet Friday does not count
+ * for as much as a busy Tuesday.
  *
- * **Same weekday.** This business runs on a weekly rhythm — Friday is half the
- * volume of a Tuesday — so a Friday measured against "a normal day" is a
- * Friday flagged every week.
- *
- * **Near by.** Resolution drifts upward across the quarter. A baseline drawn
- * from all thirteen weeks measures an early July day against September and
- * finds it three points short, which is a fact about the trend and not about
- * July.
- *
- * **Symmetric.** This is the one that took a bug to find. A window that is
- * merely *near* is one-sided at the edges of the data: the second Tuesday of
- * the quarter has one Tuesday behind it and eight ahead, so its "local"
- * baseline is drawn almost entirely from its own future, and on a rising trend
- * that future is higher than it is. Taking the same number of days on each
- * side cancels a linear drift exactly, and where that is impossible the day
- * simply cannot be judged — which is the honest answer, not a licence to
- * compare it with whatever is available.
- *
- * Excluding the day itself matters for the same reason the median does: a day
- * does not get a vote on whether it is normal.
+ * The x-axis is the day offset, so the fitted slope can be evaluated at any
+ * single day; each week sits at the mean offset of the days that contributed
+ * to it.
  */
-function comparableDays(points: readonly DailyPoint[], point: DailyPoint): DailyPoint[] {
-  const sameWeekday = points.filter(
-    (other) =>
-      other.dayIndex !== point.dayIndex && weekday(other.dayIndex) === weekday(point.dayIndex),
-  )
+function fitTrend(
+  points: readonly DailyPoint[],
+  firstDay: number,
+  pick: MetricPick,
+): LinearTrend | null {
+  const weeks = new Map<
+    number,
+    { offsets: number; calls: number; weighted: number; days: number }
+  >()
 
-  const before = sameWeekday
-    .filter((other) => other.dayIndex < point.dayIndex)
-    .sort((a, b) => b.dayIndex - a.dayIndex)
-  const after = sameWeekday
-    .filter((other) => other.dayIndex > point.dayIndex)
-    .sort((a, b) => a.dayIndex - b.dayIndex)
+  for (const point of points) {
+    const rate = pick(point)
+    if (rate === undefined || point.calls <= 0) continue
 
-  // As many weeks each side as both sides can supply, up to the window.
-  const radius = Math.min(before.length, after.length, INCIDENT_BASELINE_WEEKS)
+    const offset = point.dayIndex - firstDay
+    const week = Math.floor(offset / 7)
+    const bucket = weeks.get(week) ?? { offsets: 0, calls: 0, weighted: 0, days: 0 }
 
-  return [...before.slice(0, radius), ...after.slice(0, radius)]
+    bucket.offsets += offset
+    bucket.calls += point.calls
+    bucket.weighted += rate * point.calls
+    bucket.days += 1
+    weeks.set(week, bucket)
+  }
+
+  const trendPoints: TrendPoint[] = []
+  for (const bucket of weeks.values()) {
+    if (bucket.calls <= 0) continue
+    trendPoints.push({ x: bucket.offsets / bucket.days, y: bucket.weighted / bucket.calls })
+  }
+
+  return theilSen(trendPoints)
 }
 
-function judgeDays(points: readonly DailyPoint[]): DayJudgement[] {
+/**
+ * What one day's metric says once the quarter's drift is taken out of it.
+ *
+ * This is the number every comparison is made on. A day in the first week and
+ * a day in the last are both measured against what the trend predicted for
+ * *them*, so the same rule judges every day in the quarter — including
+ * yesterday, which is the one the dashboard opens on and the one a symmetric
+ * window could never reach.
+ */
+function residualOf(
+  point: DailyPoint,
+  firstDay: number,
+  pick: MetricPick,
+  trend: LinearTrend | null,
+): number | undefined {
+  const rate = pick(point)
+  if (rate === undefined) return undefined
+
+  return rate - trendAt(trend, point.dayIndex - firstDay)
+}
+
+type MetricJudgement = {
+  /** The day's own rate. */
+  rate: number
+  /** What a normal day in this position would have shown: trend + baseline. */
+  expected: number
+  z: number
+}
+
+/**
+ * Judge one metric on one day against the same weekday in every other week.
+ *
+ * Same weekday because the business runs on a weekly rhythm: Friday is half
+ * the volume of a Tuesday, so a Friday measured against "a normal day" is a
+ * Friday flagged every week. Every other week, rather than the nearest few,
+ * because the drift has already been removed — which is what makes one rule
+ * work at both ends of the quarter.
+ */
+function judgeMetric(
+  points: readonly DailyPoint[],
+  point: DailyPoint,
+  firstDay: number,
+  pick: MetricPick,
+  trend: LinearTrend | null,
+): MetricJudgement | null {
+  const rate = pick(point)
+  const residual = residualOf(point, firstDay, pick, trend)
+  if (rate === undefined || residual === undefined) return null
+
+  // A day does not get a vote on whether it is normal.
+  const others = points
+    .filter(
+      (other) =>
+        other.dayIndex !== point.dayIndex && weekday(other.dayIndex) === weekday(point.dayIndex),
+    )
+    .map((other) => residualOf(other, firstDay, pick, trend))
+    .filter((value): value is number => value !== undefined)
+
+  const reference = robustBaseline(others, samplingError(rate, point.calls))
+  if (reference === null) return null
+
+  return {
+    rate,
+    // Stated as a rate rather than a residual, because that is what the
+    // reader is shown: "28.4% against 6.1% on a normal Tuesday".
+    expected: trendAt(trend, point.dayIndex - firstDay) + reference.baseline,
+    z: robustZ(residual, reference),
+  }
+}
+
+function judgeDays(points: readonly DailyPoint[], firstDay: number): DayJudgement[] {
   const judgements: DayJudgement[] = []
+
+  const resolutionPick: MetricPick = (point) => point.resolutionRate
+  const toolPick: MetricPick = (point) => point.toolErrorRate
+
+  // Fitted once per pass, not per day: the trend is a property of the quarter.
+  const resolutionTrend = fitTrend(points, firstDay, resolutionPick)
+  const toolTrend = fitTrend(points, firstDay, toolPick)
 
   for (const point of points) {
     // A day too quiet to mean anything is not an incident, whatever its rates.
     if (point.calls < INCIDENT_MIN_DAY_CALLS) continue
 
-    const comparable = comparableDays(points, point)
-
-    const toolValues = comparable
-      .map((other) => other.toolErrorRate)
-      .filter((rate): rate is number => rate !== undefined)
-    const resolutionValues = comparable
-      .map((other) => other.resolutionRate)
-      .filter((rate): rate is number => rate !== undefined)
-
-    const toolRate = point.toolErrorRate
-    const resolutionRate = point.resolutionRate
-
-    /*
-     * The noise floor is computed from the *day's own* call count, because
-     * that is what limits how precisely its rate is known. A quiet day is
-     * measured less precisely and needs a larger move to stand out, which is
-     * exactly right.
-     */
-    const toolReference = robustBaseline(
-      toolValues,
-      samplingError(medianOf(toolValues), point.calls),
-    )
-    const resolutionReference = robustBaseline(
-      resolutionValues,
-      samplingError(medianOf(resolutionValues), point.calls),
-    )
-
-    const toolZ =
-      toolRate === undefined || toolReference === null ? 0 : robustZ(toolRate, toolReference)
-    const resolutionZ =
-      resolutionRate === undefined || resolutionReference === null
-        ? 0
-        : robustZ(resolutionRate, resolutionReference)
+    const tool = judgeMetric(points, point, firstDay, toolPick, toolTrend)
+    const resolution = judgeMetric(points, point, firstDay, resolutionPick, resolutionTrend)
 
     /*
      * Both halves again: unusual *and* large. The z-test on its own certifies
@@ -453,16 +502,14 @@ function judgeDays(points: readonly DailyPoint[]): DayJudgement[] {
      * agree closely, which is how a detector ends up reporting the weather.
      */
     const toolFlagged =
-      toolRate !== undefined &&
-      toolReference !== null &&
-      toolZ >= INCIDENT_ROBUST_Z &&
-      toolRate - toolReference.baseline >= pointsToRatio(INCIDENT_TOOL_ERROR_MIN_POINTS)
+      tool !== null &&
+      tool.z >= INCIDENT_ROBUST_Z &&
+      tool.rate - tool.expected >= pointsToRatio(INCIDENT_TOOL_ERROR_MIN_POINTS)
 
     const resolutionFlagged =
-      resolutionRate !== undefined &&
-      resolutionReference !== null &&
-      resolutionZ <= -INCIDENT_ROBUST_Z &&
-      resolutionReference.baseline - resolutionRate >= pointsToRatio(INCIDENT_RESOLUTION_MIN_POINTS)
+      resolution !== null &&
+      resolution.z <= -INCIDENT_ROBUST_Z &&
+      resolution.expected - resolution.rate >= pointsToRatio(INCIDENT_RESOLUTION_MIN_POINTS)
 
     if (!toolFlagged && !resolutionFlagged) continue
 
@@ -470,10 +517,10 @@ function judgeDays(points: readonly DailyPoint[]): DayJudgement[] {
       point,
       toolFlagged,
       resolutionFlagged,
-      toolBaseline: toolReference?.baseline ?? null,
-      resolutionBaseline: resolutionReference?.baseline ?? null,
-      toolZ,
-      resolutionZ,
+      toolBaseline: tool?.expected ?? null,
+      resolutionBaseline: resolution?.expected ?? null,
+      toolZ: tool?.z ?? 0,
+      resolutionZ: resolution?.z ?? 0,
     })
   }
 
@@ -510,7 +557,7 @@ function groupAdjacent(judgements: readonly DayJudgement[]): DayJudgement[][] {
 
 function detectIncidents(aggregates: Aggregates, options: DetectOptions): IncidentInsight[] {
   const points = prepareDaily(aggregates.daily, options.bounds.firstDay)
-  const flagged = judgeDays(points)
+  const flagged = judgeDays(points, options.bounds.firstDay)
   const groups = groupAdjacent(flagged)
 
   const lastFlaggedDay = flagged[flagged.length - 1]?.point.dayIndex ?? null

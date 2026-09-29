@@ -396,45 +396,86 @@ describe('incident days', () => {
     expect(incidents[1]!.evidence.quietDaysSince).toBeNull()
   })
 
-  it('refuses to judge a day too close to the edge of the data', () => {
+  it('judges every day in the quarter, including the first and the last', () => {
     /*
-     * The second Tuesday of the quarter has one Tuesday behind it and eleven
-     * ahead. A "nearby" baseline would therefore be drawn almost entirely
-     * from its own future, and on a series that drifts upward that future is
-     * higher than the present — so an ordinary early day reads as a collapse.
+     * The blind spot this replaced: baselines used to come from a window of
+     * neighbouring weeks, taken symmetrically so the quarter's upward drift
+     * cancelled. Symmetry is impossible at the ends of the data, so the first
+     * and last fortnight went unjudged — including the last week, which is
+     * the view this dashboard opens on and the period its whole question is
+     * about. A detector blind to yesterday is blind where it matters most.
      *
-     * This cost four false incidents across twelve seeds before the baseline
-     * was made symmetric. Now the honest answer is that there is nothing to
-     * compare it with.
+     * The drift is now fitted and removed instead, so one rule reaches every
+     * day. The same collapse is planted at three positions and found at all
+     * three.
      */
-    const daily = ordinaryQuarter()
-    const secondTuesday = offsetOfWeekday(2, 1)
-    daily[secondTuesday] = resolving(2200, 0.55, 0.06)
+    const positions = [
+      ['the first week', offsetOfWeekday(2, 0)],
+      ['the middle', offsetOfWeekday(2, 4)],
+      ['the last week', offsetOfWeekday(2, 8)],
+    ] as const
 
-    expect(
-      detectInsights(makeAggregates({ daily }), { range: WEEK, bounds: boundsFor(QUARTER_DAYS) }),
-    ).toEqual([])
+    for (const [where, offset] of positions) {
+      const daily = ordinaryQuarter()
+      daily[offset] = resolving(2200, 0.55, 0.06)
 
-    // The same day, planted four weeks later, is found.
-    const inland = ordinaryQuarter()
-    inland[offsetOfWeekday(2, 4)] = resolving(2200, 0.55, 0.06)
-
-    expect(
-      incidentsOf(
-        detectInsights(makeAggregates({ daily: inland }), {
+      const incidents = incidentsOf(
+        detectInsights(makeAggregates({ daily }), {
           range: WEEK,
           bounds: boundsFor(QUARTER_DAYS),
         }),
-      ),
-    ).toHaveLength(1)
+      )
+
+      expect(
+        incidents.map((incident) => incident.day),
+        where,
+      ).toEqual([FIRST_DAY + offset])
+    }
   })
 
-  it('compares a day against its own neighbourhood, not the whole quarter', () => {
+  it('finds an incident planted in the first week, at offset 7', () => {
+    /*
+     * The other end of the same blind spot. The generator cannot plant here —
+     * its deploy window starts at offset 14 — so this is a fixture, which is
+     * also the only way to name an exact offset.
+     */
+    const daily = ordinaryQuarter()
+    daily[7] = resolving(2200, 0.62, 0.3)
+
+    const incidents = incidentsOf(
+      detectInsights(makeAggregates({ daily }), {
+        range: WEEK,
+        bounds: boundsFor(QUARTER_DAYS),
+      }),
+    )
+
+    expect(incidents.map((incident) => incident.day)).toEqual([FIRST_DAY + 7])
+    expect(incidents[0]!.params.toolErrorRatio).toBeGreaterThan(4)
+  })
+
+  it('finds a collapse on the very last day of the data', () => {
+    // "What happened yesterday" is the product's question, and yesterday is
+    // always the last day of the dataset.
+    const daily = ordinaryQuarter()
+    const lastDay = QUARTER_DAYS - 1
+    daily[lastDay] = resolving(900, 0.42, 0.06)
+
+    const incidents = incidentsOf(
+      detectInsights(makeAggregates({ daily }), {
+        range: WEEK,
+        bounds: boundsFor(QUARTER_DAYS),
+      }),
+    )
+
+    expect(incidents.map((incident) => incident.day)).toEqual([FIRST_DAY + lastDay])
+  })
+
+  it('takes the quarter drift out before comparing anything', () => {
     /*
      * A quarter that drifts upward by four points end to end, with nothing
-     * wrong in it. Measured against a quarter-wide median, every day in the
-     * first weeks is "below normal" and every day in the last weeks is above;
-     * measured against its own neighbours, no day is remarkable.
+     * wrong in it. Compared against a raw quarter-wide median, every day in
+     * the first weeks is "below normal" and every day in the last weeks is
+     * above it. Against the fitted trend, no day is remarkable.
      */
     const daily = Array.from({ length: QUARTER_DAYS }, (_, offset) => {
       const dow = weekday(FIRST_DAY + offset)

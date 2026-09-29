@@ -121,7 +121,7 @@ describe('callouts on the real quarter', () => {
   it('marks the deploy day on the chart with what happened', () => {
     render(props)
 
-    expect(calloutLabels()).toEqual(['Tool errors 4.7× normal'])
+    expect(calloutLabels()).toEqual(['Tool errors 4.6× normal'])
 
     // A rule through both panels, one per day the incident covers.
     const markers = Array.from(container.querySelectorAll('line[stroke-dasharray]'))
@@ -144,7 +144,7 @@ describe('callouts on the real quarter', () => {
 
     const headers = Array.from(container.querySelectorAll('th')).map((th) => th.textContent)
     expect(headers).toContain('Note')
-    expect(container.textContent).toContain('Tool errors 4.7× normal')
+    expect(container.textContent).toContain('Tool errors 4.6× normal')
   })
 
   it('includes the note in the keyboard announcement for that day', () => {
@@ -171,7 +171,7 @@ describe('callouts on the real quarter', () => {
 
     const live = container.querySelector('[aria-live]')
     expect(live?.textContent).toContain('25 Aug')
-    expect(live?.textContent).toContain('Tool errors 4.7× normal')
+    expect(live?.textContent).toContain('Tool errors 4.6× normal')
   })
 })
 
@@ -188,7 +188,7 @@ describe('callouts on the real quarter', () => {
  */
 describe('keeping a callout inside the plot', () => {
   const WIDTH = 858 // 900 less the value-axis gutter
-  const label = 'Tool errors 4.7× normal'
+  const label = 'Tool errors 4.6× normal'
   const half = (label.length * CALLOUT_CHAR_WIDTH) / 2
 
   it('leaves a label in the middle where it is', () => {

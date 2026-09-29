@@ -59,7 +59,7 @@ describe('any other seed', () => {
     // A working day, with room on both sides for the weekday baseline.
     expect(weekday(plan.deployDay)).toBeLessThanOrEqual(4)
     expect(plan.deployDay).toBeGreaterThanOrEqual(FIRST_DAY + 14)
-    expect(plan.deployDay).toBeLessThanOrEqual(FIRST_DAY + 83)
+    // Up to and including the last day: the detector judges every one of them.
     expect(plan.deployDay).toBeLessThanOrEqual(LAST_DAY)
 
     // It declines from where that intent normally sits, and not below a floor.

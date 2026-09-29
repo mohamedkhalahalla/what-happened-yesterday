@@ -97,12 +97,21 @@ const EXCLUDED_RAREST_INTENTS = 5
 /**
  * The window the deploy day is drawn from, as offsets into the data.
  *
- * Not the first two weeks, because the incident detector compares a day
- * against the same weekday in the *other* weeks and needs a few of them on
- * each side. Not the very end, for the same reason.
+ * It runs to the last day now. It used to stop short of both ends because the
+ * detector compared each day against a symmetric window of neighbouring weeks
+ * and could not judge the days where symmetry was impossible — so the plan
+ * politely avoided planting anything the detector was blind to, and the tests
+ * never noticed the blind spot. The drift is fitted and removed now, every day
+ * is judged, and the plan is free to use the last week: the one the dashboard
+ * opens on.
+ *
+ * The first fortnight stays out, but no longer because the detector cannot
+ * cope: it can. It keeps a couple of ordinary weeks in front of every planted
+ * deploy, so the trend chart has context on both sides of the marker and
+ * "nothing like it since" counts from somewhere.
  */
 const DEPLOY_FIRST_OFFSET = 14
-const DEPLOY_LAST_OFFSET = 83
+const DEPLOY_LAST_OFFSET = DAYS - 1
 
 /** Sunday to Thursday: the Saudi working week. */
 function isWorkdayIndex(dayIndex: number): boolean {

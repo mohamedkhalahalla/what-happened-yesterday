@@ -122,21 +122,13 @@ export const INCIDENT_RESOLUTION_MIN_POINTS = 3
  * A median of two numbers is their average, and a MAD of two is half their
  * gap — neither describes "a normal Tuesday". Four other Tuesdays is the
  * point at which one bad one cannot drag the baseline to meet it.
+ *
+ * On a ninety-day quarter every day has twelve, so this never binds: it is a
+ * guard against being handed a much shorter dataset, not a statement about
+ * where in the quarter a day sits. It used to be both, and that was the bug —
+ * days near the ends of the data went unjudged, including yesterday.
  */
 export const INCIDENT_MIN_BASELINE_DAYS = 4
-
-/**
- * How far either side of a day its comparable days are taken from, in weeks.
- *
- * Resolution in this business drifts: it rises about three and a half points
- * from the first week of the quarter to the last. A baseline taken from the
- * whole quarter therefore measures an early July day against September and
- * finds it wanting — which is a fact about the trend, not about July.
- *
- * Four weeks each side is close enough that the drift inside the window is a
- * few tenths of a point, and wide enough to leave eight comparable days.
- */
-export const INCIDENT_BASELINE_WEEKS = 4
 
 /**
  * How many of each group the Fix-first widget shows before "Show all".
