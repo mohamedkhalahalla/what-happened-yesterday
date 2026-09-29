@@ -137,22 +137,40 @@ export function WidgetMenu({
           {t('widget.height')}
         </legend>
         <div className="mt-1 flex gap-1">
-          {HEIGHTS.map((h) => (
-            <button
-              key={h}
-              type="button"
-              aria-pressed={height === h}
-              disabled={HEIGHT_ROWS[h] < HEIGHT_ROWS[definition.minSize.h]}
-              onClick={() => onResize({ h })}
-              className={`flex-1 rounded-md border px-1 py-1 text-[11.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-40 ${
-                height === h
-                  ? 'border-primary bg-accent font-medium text-accent-foreground'
-                  : 'border-border text-foreground hover:bg-muted'
-              }`}
-            >
-              {t(HEIGHT_LABEL[h])}
-            </button>
-          ))}
+          {HEIGHTS.map((h) => {
+            const tooShort = HEIGHT_ROWS[h] < HEIGHT_ROWS[definition.minSize.h]
+
+            return (
+              <button
+                key={h}
+                type="button"
+                aria-pressed={height === h}
+                /*
+                  aria-disabled rather than disabled: a disabled button leaves
+                  the tab order, so the reason it is unavailable becomes
+                  unreachable by keyboard. This stays focusable and announces
+                  "unavailable, too short to show this chart" rather than
+                  silently doing nothing when pressed.
+                */
+                aria-disabled={tooShort}
+                title={tooShort ? t('widget.tooShort') : undefined}
+                onClick={() => {
+                  if (tooShort) return
+                  onResize({ h })
+                }}
+                className={`flex-1 rounded-md border px-1 py-1 text-[11.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                  tooShort ? 'cursor-not-allowed opacity-40' : ''
+                } ${
+                  height === h
+                    ? 'border-primary bg-accent font-medium text-accent-foreground'
+                    : 'border-border text-foreground hover:bg-muted'
+                }`}
+              >
+                {t(HEIGHT_LABEL[h])}
+                {tooShort && <span className="sr-only-text"> {t('widget.tooShort')}</span>}
+              </button>
+            )
+          })}
         </div>
       </fieldset>
 

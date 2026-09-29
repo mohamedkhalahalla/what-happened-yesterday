@@ -69,7 +69,10 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     titleKey: 'widget.dailyTrend.title',
     descriptionKey: 'widget.dailyTrend.description',
     defaultSize: { w: 8, h: 'M' },
-    minSize: { w: 6, h: 'S' },
+    // A chart in a ChartFrame carries a pinned title, summary and legend. At
+    // height S those consume the whole widget and the plot collapses to
+    // nothing, so S is not a size this can be drawn at.
+    minSize: { w: 6, h: 'M' },
     glossary: ['resolutionRate', 'resolved', 'previousPeriod'],
     component: DailyTrendWidget,
   },
@@ -96,7 +99,8 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     titleKey: 'widget.agentComparison.title',
     descriptionKey: 'widget.agentComparison.description',
     defaultSize: { w: 6, h: 'M' },
-    minSize: { w: 4, h: 'S' },
+    // See dailyTrend: the frame's pinned chrome leaves no room at S.
+    minSize: { w: 4, h: 'M' },
     glossary: ['transferRate', 'transferred', 'median', 'notable', 'whyFlagged', 'previousPeriod'],
     component: AgentComparisonWidget,
   },
@@ -105,7 +109,8 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     titleKey: 'widget.failureReasons.title',
     descriptionKey: 'widget.failureReasons.description',
     defaultSize: { w: 6, h: 'M' },
-    minSize: { w: 4, h: 'S' },
+    // See dailyTrend: the frame's pinned chrome leaves no room at S.
+    minSize: { w: 4, h: 'M' },
     glossary: [
       'per100',
       'handoffReason',

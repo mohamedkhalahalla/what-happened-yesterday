@@ -63,9 +63,22 @@ describe('ChartFrame scroll containment', () => {
     expect(classes).not.toBeNull()
     // The bug in one assertion: without this the legend scrolls away.
     expect(classes).toContain('overflow-auto')
-    // flex-1 + min-h-0 is what gives the scroll box a definite height.
-    expect(classes).toContain('min-h-0')
+    // flex-1 plus a min-height is what gives the scroll box a definite,
+    // shrinkable height. The floor is asserted in its own test below.
     expect(classes).toContain('flex-1')
+    expect(classes).toMatch(/min-h-\d/)
+  })
+
+  it('gives the chart body a floor so it cannot collapse to zero', () => {
+    // Found in manual testing at height S: the pinned title, summary and
+    // legend consumed the whole widget and the plot shrank to nothing, so the
+    // widget showed text and no chart. The registry now stops a chart being
+    // set that short, and this is the belt to that braces — a widget that ends
+    // up short for any other reason scrolls instead of hiding its content.
+    const classes = classesOfElementWith(render('chart'), 'role="application"')
+
+    expect(classes).toContain('min-h-32')
+    expect(classes).not.toContain('min-h-0')
   })
 
   it('scrolls inside the table view too', () => {

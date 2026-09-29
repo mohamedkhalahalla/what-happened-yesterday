@@ -250,6 +250,52 @@ describe('validateLayout', () => {
     expect(validateLayout(input)).toEqual(defaultLayout())
   })
 
+  it('raises a saved size that is below the widget minimum', () => {
+    // agentComparison was once allowed at height S. Anyone who set it then
+    // still has 'S' in localStorage, and at that height the chart collapses
+    // to nothing behind its own title. Reading the layout repairs it rather
+    // than rendering it broken.
+    expect(WIDGETS.agentComparison.minSize.h).toBe('M')
+
+    const layout = validateLayout({
+      version: 1,
+      items: [{ id: 'agentComparison', w: 6, h: 'S' }],
+    })
+
+    expect(layout.items[0]).toEqual({ id: 'agentComparison', w: 6, h: 'M' })
+  })
+
+  it('raises a saved width below the widget minimum too', () => {
+    const layout = validateLayout({ version: 1, items: [{ id: 'kpis', w: 4, h: 'M' }] })
+    expect(layout.items[0]!.w).toBe(WIDGETS.kpis.minSize.w)
+  })
+
+  it('leaves a saved size at or above the minimum alone', () => {
+    const layout = validateLayout({
+      version: 1,
+      items: [
+        { id: 'agentComparison', w: 6, h: 'L' },
+        { id: 'dailyTrend', w: 8, h: 'M' },
+      ],
+    })
+    expect(layout.items[0]!.h).toBe('L')
+    expect(layout.items[1]!.h).toBe('M')
+  })
+
+  it('never returns a layout containing a size below its widget minimum', () => {
+    // Whatever went in, nothing comes out that cannot be drawn.
+    const layout = validateLayout({
+      version: 1,
+      items: WIDGET_IDS.map((id) => ({ id, w: 4, h: 'S' })),
+    })
+
+    for (const item of layout.items) {
+      const min = WIDGETS[item.id].minSize
+      expect(item.w, item.id).toBeGreaterThanOrEqual(min.w)
+      expect(HEIGHT_ROWS[item.h], item.id).toBeGreaterThanOrEqual(HEIGHT_ROWS[min.h])
+    }
+  })
+
   it('drops a saved peakHours widget, which no longer exists', () => {
     // Anyone who had it on their canvas before it was cut still has it in
     // localStorage. Validation must quietly drop it rather than rendering a

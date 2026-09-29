@@ -199,10 +199,20 @@ export function validateLayout(raw: unknown): Layout {
     seen.add(id)
 
     const definition = WIDGETS[id]
+    /*
+     * A stored size can be valid and still be too small: a layout saved
+     * before a widget's minimum was raised will name a size the widget can no
+     * longer be drawn at. Clamping on read means an old layout renders
+     * correctly rather than rendering broken, and the owner never has to know
+     * the minimum changed.
+     */
+    const width = isWidth(w) ? w : definition.defaultSize.w
+    const height = isHeight(h) ? h : definition.defaultSize.h
+
     items.push({
       id,
-      w: isWidth(w) ? w : definition.defaultSize.w,
-      h: isHeight(h) ? h : definition.defaultSize.h,
+      w: Math.max(width, definition.minSize.w) as WidgetWidth,
+      h: HEIGHT_ROWS[height] < HEIGHT_ROWS[definition.minSize.h] ? definition.minSize.h : height,
     })
   }
 

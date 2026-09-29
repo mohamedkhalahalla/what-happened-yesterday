@@ -272,6 +272,8 @@ export const en = {
 
   'reasons.worse': 'Worse',
 
+  'widget.tooShort': 'Too short to show this chart',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

@@ -263,6 +263,8 @@ export const ar: Record<MessageKey, string> = {
 
   'reasons.worse': 'تفاقم',
 
+  'widget.tooShort': 'قصير جدًا لعرض هذا الرسم',
+
   'perf.readout':
     'احتُسبت خلال {worker} مللي ثانية (العامل) · {roundTrip} مللي ثانية ذهابًا وإيابًا',
 }

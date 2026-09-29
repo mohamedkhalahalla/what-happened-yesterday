@@ -140,6 +140,14 @@ export function ChartFrame<Row>({
             onFocus={onFocus}
             onBlur={onBlur}
             /*
+              min-h-32 rather than min-h-0 is a floor the chart cannot be
+              squeezed below. The registry stops a chart being *set* to a
+              height it cannot draw at, but a widget can still end up short —
+              a narrow viewport, a future size step — and a plot collapsed to
+              zero pixels renders as a title with nothing under it. With a
+              floor the widget body scrolls instead, which is visibly a
+              too-small widget rather than a broken one.
+
               overflow-auto matters as much as the styling here. Without it
               the chart view establishes no scroll container, so a tall chart
               overflows the whole <figure> into the widget body and the title,
@@ -148,7 +156,7 @@ export function ChartFrame<Row>({
               The two views have to behave the same way or switching between
               them moves the furniture.
             */
-            className="min-h-0 flex-1 overflow-auto rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="min-h-32 flex-1 overflow-auto rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {children}
           </div>
