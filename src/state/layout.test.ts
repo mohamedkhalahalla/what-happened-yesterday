@@ -33,9 +33,9 @@ describe('defaultLayout', () => {
     }
   })
 
-  it('leaves peakHours off the canvas, available from the catalog', () => {
+  it('no longer knows about the cut peak-hours widget', () => {
+    expect(WIDGET_IDS).not.toContain('peakHours')
     expect(ids(base())).not.toContain('peakHours')
-    expect(WIDGET_IDS).toContain('peakHours')
   })
 
   it('returns a fresh object each time, so callers cannot mutate the default', () => {
@@ -104,7 +104,8 @@ describe('moveBy', () => {
   })
 
   it('ignores a widget that is not on the canvas', () => {
-    expect(moveBy(base(), 'peakHours', 1)).toEqual(base())
+    const without = remove(base(), 'failureReasons')
+    expect(moveBy(without, 'failureReasons', 1)).toEqual(without)
   })
 })
 
@@ -144,14 +145,18 @@ describe('resize', () => {
 
 describe('add and remove', () => {
   it('appends at the default size', () => {
-    const layout = add(base(), 'peakHours')
-    expect(ids(layout).at(-1)).toBe('peakHours')
-    expect(layout.items.at(-1)?.w).toBe(WIDGETS.peakHours.defaultSize.w)
+    // Every widget is on the default canvas now, so removing one first is the
+    // only way to have something to add back.
+    const without = remove(base(), 'kpis')
+    const layout = add(without, 'kpis')
+
+    expect(ids(layout).at(-1)).toBe('kpis')
+    expect(layout.items.at(-1)?.w).toBe(WIDGETS.kpis.defaultSize.w)
   })
 
   it('refuses to add a widget twice', () => {
-    const once = add(base(), 'peakHours')
-    expect(add(once, 'peakHours')).toEqual(once)
+    const once = add(remove(base(), 'kpis'), 'kpis')
+    expect(add(once, 'kpis')).toEqual(once)
   })
 
   it('removes by id', () => {
@@ -161,7 +166,8 @@ describe('add and remove', () => {
   })
 
   it('ignores removing something that is not there', () => {
-    expect(remove(base(), 'peakHours')).toEqual(base())
+    const without = remove(base(), 'kpis')
+    expect(remove(without, 'kpis')).toEqual(without)
   })
 
   it('can remove everything', () => {
@@ -215,8 +221,7 @@ describe('reset', () => {
   it('returns the default layout whatever was there before', () => {
     let layout = base()
     layout = remove(layout, 'kpis')
-    layout = resize(layout, 'dailyTrend', { w: 4 })
-    layout = add(layout, 'peakHours')
+    layout = resize(layout, 'dailyTrend', { w: 6 })
 
     expect(reset()).toEqual(defaultLayout())
     expect(reset()).not.toEqual(layout)
@@ -225,7 +230,7 @@ describe('reset', () => {
 
 describe('validateLayout', () => {
   it('accepts a layout it wrote itself', () => {
-    const layout = resize(add(base(), 'peakHours'), 'kpis', { w: 6 })
+    const layout = resize(remove(base(), 'failureReasons'), 'kpis', { w: 6 })
     expect(validateLayout(JSON.parse(JSON.stringify(layout)))).toEqual(layout)
   })
 
@@ -243,6 +248,30 @@ describe('validateLayout', () => {
     ['items null', { version: 1, items: null }],
   ])('falls back to the default for %s', (_name, input) => {
     expect(validateLayout(input)).toEqual(defaultLayout())
+  })
+
+  it('drops a saved peakHours widget, which no longer exists', () => {
+    // Anyone who had it on their canvas before it was cut still has it in
+    // localStorage. Validation must quietly drop it rather than rendering a
+    // widget with no component, and must keep the rest of their layout.
+    const layout = validateLayout({
+      version: 1,
+      items: [
+        { id: 'kpis', w: 12, h: 'M' },
+        { id: 'peakHours', w: 6, h: 'M' },
+        { id: 'dailyTrend', w: 8, h: 'M' },
+      ],
+    })
+
+    expect(ids(layout)).toEqual(['kpis', 'dailyTrend'])
+    expect(ids(layout)).not.toContain('peakHours')
+  })
+
+  it('falls back to the default when peakHours was the only widget saved', () => {
+    // Every entry was garbage, so there is no layout left to honour.
+    expect(validateLayout({ version: 1, items: [{ id: 'peakHours', w: 6, h: 'M' }] })).toEqual(
+      defaultLayout(),
+    )
   })
 
   it('drops unknown widget ids', () => {

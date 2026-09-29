@@ -21,11 +21,9 @@ import { DailyTrendWidget } from './DailyTrendWidget'
 import { FailureReasonsWidget } from './FailureReasonsWidget'
 import { IntentTableWidget } from './IntentTableWidget'
 import { KpisWidget } from './KpisWidget'
-import { PeakHoursWidget } from './PeakHoursWidget'
 import type { WidgetProps } from './types'
 
-export type WidgetId =
-  'kpis' | 'dailyTrend' | 'intentTable' | 'agentComparison' | 'failureReasons' | 'peakHours'
+export type WidgetId = 'kpis' | 'dailyTrend' | 'intentTable' | 'agentComparison' | 'failureReasons'
 
 /** Column span on the 12-column grid: a third, a half, two thirds, full. */
 export type WidgetWidth = 4 | 6 | 8 | 12
@@ -110,15 +108,6 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     glossary: ['per100', 'handoffReason', 'toolError', 'abandoned', 'notable', 'previousPeriod'],
     component: FailureReasonsWidget,
   },
-  peakHours: {
-    id: 'peakHours',
-    titleKey: 'widget.peakHours.title',
-    descriptionKey: 'widget.peakHours.description',
-    defaultSize: { w: 6, h: 'M' },
-    minSize: { w: 4, h: 'S' },
-    glossary: ['resolved', 'transferred', 'abandoned'],
-    component: PeakHoursWidget,
-  },
 }
 
 /** Every widget id, in registry order. */
@@ -129,11 +118,12 @@ export function isWidgetId(value: unknown): value is WidgetId {
 }
 
 /**
- * The widgets on a fresh canvas.
+ * The widgets on a fresh canvas — currently all of them.
  *
- * `peakHours` is deliberately absent: it answers a capacity-planning question
- * rather than a "what happened yesterday" one, so it lives in the catalog for
- * whoever wants it instead of taking space from everyone who does not.
+ * `peakHours` used to live here as a catalog-only extra. It was cut: it
+ * answered a capacity-planning question, not one of the three this dashboard
+ * exists for, and a catalog with one entry is not a catalog. The catalog
+ * machinery stays, because the next widget will use it.
  */
 export const DEFAULT_WIDGET_IDS: readonly WidgetId[] = [
   'kpis',

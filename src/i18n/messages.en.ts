@@ -92,9 +92,6 @@ export const en = {
   'widget.failureReasons.title': 'Failure reasons',
   'widget.failureReasons.description':
     'Why calls were handed to a human, and how often tools failed. Answers: why are calls failing?',
-  'widget.peakHours.title': 'Peak hours',
-  'widget.peakHours.description':
-    'Call volume by weekday and hour in Riyadh time. Answers: when are calls coming in?',
   'widget.move': 'Move {title}',
   'widget.menu': 'Options for {title}',
   'widget.glossary': 'What these numbers mean',

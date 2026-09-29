@@ -87,9 +87,6 @@ export const ar: Record<MessageKey, string> = {
   'widget.failureReasons.title': 'أسباب الإخفاق',
   'widget.failureReasons.description':
     'أسباب تحويل المكالمات إلى موظف، وعدد أخطاء الأنظمة. يجيب على: لماذا تخفق المكالمات؟',
-  'widget.peakHours.title': 'ساعات الذروة',
-  'widget.peakHours.description':
-    'حجم المكالمات حسب اليوم والساعة بتوقيت الرياض. يجيب على: متى تأتي المكالمات؟',
   'widget.move': 'تحريك {title}',
   'widget.menu': 'خيارات {title}',
   'widget.glossary': 'ماذا تعني هذه الأرقام',
