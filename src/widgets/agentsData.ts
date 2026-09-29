@@ -12,9 +12,16 @@
 
 import type { Aggregates } from '../engine/types'
 import { compareRates, type Comparison } from '../lib/stats'
+import { AGENT_OUTLIER_RATIO } from '../lib/thresholds'
 
-/** An agent at or above this multiple of the median gets a badge. */
-export const OUTLIER_MULTIPLE = 1.5
+/**
+ * An agent at or above this multiple of the median gets a badge.
+ *
+ * Re-exported from `thresholds.ts` rather than defined here: the Fix-first
+ * detector uses the same number, and two constants that must agree are two
+ * constants that will eventually disagree.
+ */
+export const OUTLIER_MULTIPLE = AGENT_OUTLIER_RATIO
 
 export type AgentRow = {
   code: number

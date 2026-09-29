@@ -31,6 +31,10 @@ export type QuarterTrend = {
   comparison: Comparison
   /** True when the decline is both downward and bigger than noise. */
   declining: boolean
+  /** The first window's totals — what it used to be. */
+  early: Counts
+  /** The last window's totals — what it is now. */
+  recent: Counts
   /**
    * True when the rise is both upward and material.
    *
@@ -130,6 +134,10 @@ export function quarterTrend(
   return {
     delta: comparison.delta,
     comparison,
+    // Exposed so a caller can say how much the decline costs a week without
+    // recomputing the windows and risking a different answer from the badge.
+    early: first,
+    recent: last,
     declining: notable && comparison.delta < 0,
     improving: notable && comparison.delta > 0,
   }
