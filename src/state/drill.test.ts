@@ -61,8 +61,14 @@ describe('serializeDrill', () => {
     expect(value).toBe('agent:agent_06,outcome:transferred,toolerrors:yes')
   })
 
-  it('emits nothing for an empty drill on the dashboard range', () => {
-    expect(serializeDrill(req(), DASH)).toBe('')
+  it('names a drill that narrows nothing, rather than emitting nothing', () => {
+    /*
+     * The empty string was indistinguishable from "no drill": the parameter
+     * was dropped and the panel never opened, so the Calls KPI looked like a
+     * number that was not clickable. "All the calls on screen" is a real
+     * request and needs a word of its own.
+     */
+    expect(serializeDrill(req(), DASH)).toBe('all')
   })
 })
 
@@ -101,11 +107,7 @@ describe('round trip', () => {
     const { request: back, invalid } = parseDrill(search, DASH, bounds)
 
     expect(invalid).toBe(false)
-    if (serializeDrill(request, DASH) === '') {
-      // An empty value is "no drill", which is the honest reading.
-      expect(back).toBeNull()
-      return
-    }
+    expect(back).not.toBeNull()
     expect(back!.range).toEqual(request.range)
     expect(back!.constraints).toEqual(request.constraints)
   })
@@ -113,7 +115,6 @@ describe('round trip', () => {
   it('is stable: re-serializing a parsed drill gives the same string', () => {
     for (const { request } of cases) {
       const once = serializeDrill(request, DASH)
-      if (once === '') continue
       const parsed = parseDrill(`?drill=${once}`, DASH, bounds).request!
       expect(serializeDrill(parsed, DASH)).toBe(once)
     }
@@ -129,6 +130,17 @@ describe('round trip', () => {
 })
 
 describe('parseDrill never throws and rejects what it cannot honour', () => {
+  it('opens a drill that narrows nothing', () => {
+    // The Calls KPI and the All chip both ask for this. It has to be a drill
+    // the panel can open, not a value the parser reads as "never mind".
+    const { request, invalid } = parseDrill('?drill=all', DASH, bounds)
+
+    expect(invalid).toBe(false)
+    expect(request).not.toBeNull()
+    expect(request!.constraints).toEqual({})
+    expect(request!.range).toEqual(DASH)
+  })
+
   it('reports no drill when the parameter is absent or empty', () => {
     for (const search of ['', '?agents=agent_06', '?drill=', '?drill=%20']) {
       const result = parseDrill(search, DASH, bounds)

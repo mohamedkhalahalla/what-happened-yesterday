@@ -84,6 +84,18 @@ export function useDrill(): DrillContextValue {
 /** Key order in the emitted value, so the same drill always spells the same. */
 const KEY_ORDER = ['from', 'to', 'intent', 'agent', 'outcome', 'handoff', 'toolerrors'] as const
 
+/**
+ * What a drill that narrows nothing spells itself as.
+ *
+ * "All the calls in the period on screen" is a real, useful drill — it is what
+ * the Calls KPI and the All chip ask for — but every other part of the value
+ * is a constraint, so without a word of its own it would serialize to the
+ * empty string. An empty `drill=` is indistinguishable from no drill at all,
+ * which is exactly how it behaved: the parameter was dropped and the panel
+ * never opened. The sentinel makes "no narrowing" something the URL can say.
+ */
+const ALL = 'all'
+
 function indexOfId(ids: readonly string[], id: string): number | null {
   const index = ids.indexOf(id)
   return index === -1 ? null : index
@@ -129,6 +141,8 @@ export function parseDrill(
   for (const piece of raw.split(',')) {
     const trimmed = piece.trim()
     if (trimmed === '') continue
+    // The one bare word in the grammar: a drill that narrows nothing.
+    if (trimmed === ALL) continue
 
     const separator = trimmed.indexOf(':')
     if (separator === -1) return { request: null, invalid: true }
@@ -228,6 +242,8 @@ export function serializeDrill(request: DrillRequest, dashboardRange: DayRange):
   if (outcome !== undefined) parts.set('outcome', outcome)
   if (handoffId !== undefined) parts.set('handoff', handoffId)
   if (hasToolErrors === true) parts.set('toolerrors', 'yes')
+
+  if (parts.size === 0) return ALL
 
   return KEY_ORDER.filter((key) => parts.has(key))
     .map((key) => `${key}:${parts.get(key)!}`)

@@ -29,6 +29,7 @@ import type { Dataset } from '../data/types'
 import { aggregate } from '../engine/aggregate'
 import type { Aggregates } from '../engine/types'
 import { I18nProvider } from '../i18n/I18nProvider'
+import { formatInt, formatPercent } from '../lib/format'
 import { boundsOf, comparisonRange, type DataBounds } from '../state/presets'
 import { DrillContext, type DrillRequest } from '../state/drill'
 import { defaultFilterState, type FilterState } from '../state/url'
@@ -100,8 +101,8 @@ function render(widget: ReactNode): void {
   })
 }
 
-/** Click the first element matching `selector`, or fail saying what was there. */
-function click(selector: string, match?: (el: Element) => boolean): void {
+/** The first element matching `selector`, or a failure saying what was there. */
+function find(selector: string, match?: (el: Element) => boolean): Element {
   const candidates = Array.from(container.querySelectorAll(selector))
   const target = match === undefined ? candidates[0] : candidates.find(match)
 
@@ -109,6 +110,11 @@ function click(selector: string, match?: (el: Element) => boolean): void {
     const labels = candidates.map((el) => el.getAttribute('aria-label') ?? el.textContent)
     throw new Error(`No match for ${selector}. Candidates: ${JSON.stringify(labels)}`)
   }
+  return target
+}
+
+function click(selector: string, match?: (el: Element) => boolean): void {
+  const target = find(selector, match)
 
   act(() => {
     target.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -127,27 +133,47 @@ const byLabel =
     (el.getAttribute('aria-label') ?? '').includes(text)
 
 describe('KPIs', () => {
-  it.each([
-    ['Resolution rate', 'resolved'],
-    ['Transfer rate', 'transferred'],
-    ['Abandonment rate', 'abandoned'],
-  ])('%s opens its own outcome', (label, outcome) => {
+  /**
+   * Every KPI, including the one that narrows to nothing.
+   *
+   * The Calls card was the one that broke: with no outcome to name, its drill
+   * serialized to the empty string, the URL dropped the parameter, and the
+   * panel never opened — so the number looked like plain text while the three
+   * rates beside it worked. Hence `{}` being an expectation in its own right
+   * here, and `drill.test.ts` asserting the value the URL now carries.
+   */
+  const cases = [
+    { label: 'Resolution rate', constraints: { outcome: 'resolved' }, pick: 'resolved' },
+    { label: 'Transfer rate', constraints: { outcome: 'transferred' }, pick: 'transferred' },
+    { label: 'Abandonment rate', constraints: { outcome: 'abandoned' }, pick: 'abandoned' },
+    { label: 'Calls', constraints: {}, pick: 'calls' },
+  ] as const
+
+  /** What the card should be showing, formatted exactly as the widget does. */
+  const expectedValue = (pick: (typeof cases)[number]['pick']): string =>
+    pick === 'calls'
+      ? formatInt('en', data.current.calls)
+      : formatPercent('en', data.current[pick] / data.current.calls)
+
+  it.each(cases)('$label: the value itself is the button', ({ label, pick }) => {
+    render(<KpisWidget {...props} />)
+
+    const control = find('*', byLabel(`the calls behind ${label}`))
+
+    // Not a separate "show calls" link beside the figure: the figure.
+    expect(control.tagName).toBe('BUTTON')
+    expect(control.textContent).toBe(expectedValue(pick))
+  })
+
+  it.each(cases)('$label: opens the calls behind it', ({ label, constraints }) => {
     render(<KpisWidget {...props} />)
     click('button', byLabel(`the calls behind ${label}`))
 
     expect(lastRequest()).toEqual({
       range: filters.range,
-      constraints: { outcome },
+      constraints,
       source: 'kpis',
     })
-  })
-
-  it('the call count opens every call, unnarrowed', () => {
-    render(<KpisWidget {...props} />)
-    click('button', byLabel('the calls behind Calls'))
-
-    // No outcome: "how many calls" is answered by all of them.
-    expect(lastRequest().constraints).toEqual({})
   })
 
   it('each breakdown segment opens that slice', () => {
