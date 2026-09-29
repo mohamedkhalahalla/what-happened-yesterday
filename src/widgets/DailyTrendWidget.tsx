@@ -24,6 +24,7 @@ import { scaleLinear } from 'd3-scale'
 import { line } from 'd3-shape'
 
 import { TimeAxis, ValueAxis, thinTicks } from '../charts/Axis'
+import { clampCalloutX } from '../charts/callout'
 import { ChartFrame, type ChartTableColumn, type LegendItem } from '../charts/ChartFrame'
 import { ResponsiveSvg } from '../charts/ResponsiveSvg'
 import { moveCursor } from '../charts/cursor'
@@ -60,16 +61,6 @@ const AXIS_HEIGHT = 18
 
 /** Where an incident's label sits inside the resolution panel, from its top. */
 const CALLOUT_LABEL_Y = 10
-
-/**
- * Assumed width of one character of the callout label, in pixels.
- *
- * SVG text cannot be measured before it is drawn, and measuring it afterwards
- * would cost a layout pass per frame. An estimate is enough here because it is
- * only used to keep the label inside the plot: erring wide costs a few pixels
- * of margin, and erring narrow would push a word over the value axis.
- */
-const CALLOUT_CHAR_WIDTH = 5.4
 
 /** Where each panel's plot area begins, measured from the top of the SVG. */
 const RESOLUTION_TOP = PANEL_TITLE_HEIGHT
@@ -478,17 +469,9 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                 for (let day = range.from; day <= range.to; day++) days.push(day)
 
                 const label = notes.get(incident.day) ?? ''
-                /*
-                 * Clamped into the plot, in the plot's own coordinates. The
-                 * scale is already mirrored for RTL, so clamping here keeps
-                 * the label off the value axis in both directions without a
-                 * branch on language — the axis sits outside this group.
-                 */
-                const halfLabel = (label.length * CALLOUT_CHAR_WIDTH) / 2
-                const labelX = Math.min(
-                  Math.max(x(incident.day), halfLabel),
-                  Math.max(halfLabel, innerWidth - halfLabel),
-                )
+                // Clamped into the plot, in the plot's own (already mirrored)
+                // coordinates — see `charts/callout.ts`.
+                const labelX = clampCalloutX(x(incident.day), label, innerWidth)
 
                 return (
                   <g key={incident.id} transform={`translate(${originX}, ${RESOLUTION_TOP})`}>

@@ -375,7 +375,9 @@ describe('incident days', () => {
 
   it('says how long it has been quiet since, and only when it has', () => {
     const daily = ordinaryQuarter()
-    const early = offsetOfWeekday(2, 1)
+    // The 5th and 7th Tuesdays: both far enough from the ends of the data to
+    // have four comparable Tuesdays on each side. See the edge test below.
+    const early = offsetOfWeekday(2, 4)
     const late = offsetOfWeekday(2, 6)
     daily[early] = resolving(2200, 0.65, 0.29)
     daily[late] = resolving(2200, 0.65, 0.29)
@@ -392,6 +394,58 @@ describe('incident days', () => {
     // The later one has nothing after it; the earlier one does.
     expect(incidents[0]!.evidence.quietDaysSince).toBe(QUARTER_DAYS - 1 - late)
     expect(incidents[1]!.evidence.quietDaysSince).toBeNull()
+  })
+
+  it('refuses to judge a day too close to the edge of the data', () => {
+    /*
+     * The second Tuesday of the quarter has one Tuesday behind it and eleven
+     * ahead. A "nearby" baseline would therefore be drawn almost entirely
+     * from its own future, and on a series that drifts upward that future is
+     * higher than the present — so an ordinary early day reads as a collapse.
+     *
+     * This cost four false incidents across twelve seeds before the baseline
+     * was made symmetric. Now the honest answer is that there is nothing to
+     * compare it with.
+     */
+    const daily = ordinaryQuarter()
+    const secondTuesday = offsetOfWeekday(2, 1)
+    daily[secondTuesday] = resolving(2200, 0.55, 0.06)
+
+    expect(
+      detectInsights(makeAggregates({ daily }), { range: WEEK, bounds: boundsFor(QUARTER_DAYS) }),
+    ).toEqual([])
+
+    // The same day, planted four weeks later, is found.
+    const inland = ordinaryQuarter()
+    inland[offsetOfWeekday(2, 4)] = resolving(2200, 0.55, 0.06)
+
+    expect(
+      incidentsOf(
+        detectInsights(makeAggregates({ daily: inland }), {
+          range: WEEK,
+          bounds: boundsFor(QUARTER_DAYS),
+        }),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('compares a day against its own neighbourhood, not the whole quarter', () => {
+    /*
+     * A quarter that drifts upward by four points end to end, with nothing
+     * wrong in it. Measured against a quarter-wide median, every day in the
+     * first weeks is "below normal" and every day in the last weeks is above;
+     * measured against its own neighbours, no day is remarkable.
+     */
+    const daily = Array.from({ length: QUARTER_DAYS }, (_, offset) => {
+      const dow = weekday(FIRST_DAY + offset)
+      const isWeekend = dow >= 5
+      const drift = 0.04 * (offset / (QUARTER_DAYS - 1))
+      return resolving(isWeekend ? 900 : 2200, (isWeekend ? 0.6 : 0.7) + drift, 0.06)
+    })
+
+    expect(
+      detectInsights(makeAggregates({ daily }), { range: WEEK, bounds: boundsFor(QUARTER_DAYS) }),
+    ).toEqual([])
   })
 
   it('flags a collapse in resolution even when tool errors look normal', () => {

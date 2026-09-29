@@ -39,6 +39,7 @@ import { prepareDaily, type DailyPoint } from '../widgets/dailyTrendData'
 import { compareRates, type Comparison } from '../lib/stats'
 import {
   AGENT_OUTLIER_RATIO,
+  INCIDENT_BASELINE_WEEKS,
   INCIDENT_MIN_BASELINE_DAYS,
   INCIDENT_MIN_DAY_CALLS,
   INCIDENT_RESOLUTION_MIN_POINTS,
@@ -292,8 +293,26 @@ const MAD_TO_SD = 1.4826
 
 export type RobustBaseline = {
   baseline: number
-  /** MAD-derived spread. Zero when every comparable day was identical. */
+  /** How far this metric wanders on an ordinary day, in the same units. */
   spread: number
+}
+
+/**
+ * The sampling error of a rate measured from `calls` calls.
+ *
+ * This is the floor under every spread estimate, and it is what stops the
+ * detector claiming certainty the arithmetic cannot support. A day's
+ * resolution rate is a proportion drawn from a few thousand calls; it has an
+ * irreducible standard error of about nine tenths of a point whatever the
+ * neighbouring days happen to look like.
+ *
+ * Without it, a run of quiet weeks collapses the MAD to a few hundredths of a
+ * point and a three-point move scores z = −10 — a number that says
+ * "impossible" about something the same dataset does on its own.
+ */
+function samplingError(rate: number, calls: number): number {
+  if (calls <= 0) return 0
+  return Math.sqrt(Math.max(rate * (1 - rate), 0) / calls)
 }
 
 /**
@@ -303,13 +322,18 @@ export type RobustBaseline = {
  * being looked for is exactly the kind of value that would drag a mean toward
  * itself and inflate an SD — and a bad day that moves its own baseline is a
  * bad day that cannot be detected.
+ *
+ * `noiseFloor` is the smallest spread this metric can honestly have: see
+ * {@link samplingError}. The larger of the two wins, so a genuinely volatile
+ * metric keeps its measured spread and a suspiciously calm one is held to
+ * what its sample size allows.
  */
-export function robustBaseline(values: readonly number[]): RobustBaseline | null {
+export function robustBaseline(values: readonly number[], noiseFloor = 0): RobustBaseline | null {
   if (values.length < INCIDENT_MIN_BASELINE_DAYS) return null
 
   const baseline = medianOf(values)
-  const spread = MAD_TO_SD * medianOf(values.map((value) => Math.abs(value - baseline)))
-  return { baseline, spread }
+  const mad = MAD_TO_SD * medianOf(values.map((value) => Math.abs(value - baseline)))
+  return { baseline, spread: Math.max(mad, noiseFloor) }
 }
 
 /**
@@ -337,14 +361,51 @@ type DayJudgement = {
 }
 
 /**
- * Baselines from the **same weekday in the other weeks**.
+ * The days one day is judged against: **the same weekday, symmetrically, near
+ * by**.
  *
- * This business runs on a weekly rhythm: Friday is half the volume of a
- * Tuesday and resolves differently, so a Friday measured against "a normal
- * day" is a Friday flagged every week. Excluding the day itself matters for
- * the same reason the median does — a day is not allowed to vote on whether it
- * is normal.
+ * Three properties, each load-bearing:
+ *
+ * **Same weekday.** This business runs on a weekly rhythm — Friday is half the
+ * volume of a Tuesday — so a Friday measured against "a normal day" is a
+ * Friday flagged every week.
+ *
+ * **Near by.** Resolution drifts upward across the quarter. A baseline drawn
+ * from all thirteen weeks measures an early July day against September and
+ * finds it three points short, which is a fact about the trend and not about
+ * July.
+ *
+ * **Symmetric.** This is the one that took a bug to find. A window that is
+ * merely *near* is one-sided at the edges of the data: the second Tuesday of
+ * the quarter has one Tuesday behind it and eight ahead, so its "local"
+ * baseline is drawn almost entirely from its own future, and on a rising trend
+ * that future is higher than it is. Taking the same number of days on each
+ * side cancels a linear drift exactly, and where that is impossible the day
+ * simply cannot be judged — which is the honest answer, not a licence to
+ * compare it with whatever is available.
+ *
+ * Excluding the day itself matters for the same reason the median does: a day
+ * does not get a vote on whether it is normal.
  */
+function comparableDays(points: readonly DailyPoint[], point: DailyPoint): DailyPoint[] {
+  const sameWeekday = points.filter(
+    (other) =>
+      other.dayIndex !== point.dayIndex && weekday(other.dayIndex) === weekday(point.dayIndex),
+  )
+
+  const before = sameWeekday
+    .filter((other) => other.dayIndex < point.dayIndex)
+    .sort((a, b) => b.dayIndex - a.dayIndex)
+  const after = sameWeekday
+    .filter((other) => other.dayIndex > point.dayIndex)
+    .sort((a, b) => a.dayIndex - b.dayIndex)
+
+  // As many weeks each side as both sides can supply, up to the window.
+  const radius = Math.min(before.length, after.length, INCIDENT_BASELINE_WEEKS)
+
+  return [...before.slice(0, radius), ...after.slice(0, radius)]
+}
+
 function judgeDays(points: readonly DailyPoint[]): DayJudgement[] {
   const judgements: DayJudgement[] = []
 
@@ -352,23 +413,32 @@ function judgeDays(points: readonly DailyPoint[]): DayJudgement[] {
     // A day too quiet to mean anything is not an incident, whatever its rates.
     if (point.calls < INCIDENT_MIN_DAY_CALLS) continue
 
-    const sameWeekday = points.filter(
-      (other) =>
-        other.dayIndex !== point.dayIndex && weekday(other.dayIndex) === weekday(point.dayIndex),
-    )
+    const comparable = comparableDays(points, point)
 
-    const toolValues = sameWeekday
+    const toolValues = comparable
       .map((other) => other.toolErrorRate)
       .filter((rate): rate is number => rate !== undefined)
-    const resolutionValues = sameWeekday
+    const resolutionValues = comparable
       .map((other) => other.resolutionRate)
       .filter((rate): rate is number => rate !== undefined)
 
-    const toolReference = robustBaseline(toolValues)
-    const resolutionReference = robustBaseline(resolutionValues)
-
     const toolRate = point.toolErrorRate
     const resolutionRate = point.resolutionRate
+
+    /*
+     * The noise floor is computed from the *day's own* call count, because
+     * that is what limits how precisely its rate is known. A quiet day is
+     * measured less precisely and needs a larger move to stand out, which is
+     * exactly right.
+     */
+    const toolReference = robustBaseline(
+      toolValues,
+      samplingError(medianOf(toolValues), point.calls),
+    )
+    const resolutionReference = robustBaseline(
+      resolutionValues,
+      samplingError(medianOf(resolutionValues), point.calls),
+    )
 
     const toolZ =
       toolRate === undefined || toolReference === null ? 0 : robustZ(toolRate, toolReference)

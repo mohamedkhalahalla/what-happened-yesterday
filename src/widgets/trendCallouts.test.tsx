@@ -11,10 +11,10 @@
  * 2. It survives into the table view and the keyboard announcement. The table
  *    is a peer of the chart, not a fallback, so anything the chart marks has
  *    to be readable without seeing it.
- * 3. The label stays **inside the plot**. An incident on the last day of the
- *    quarter sits at the edge of the chart in English and at the opposite edge
- *    in Arabic, and an unclamped label runs over the value axis in one of
- *    them — which is exactly the kind of bug that only shows up in the
+ * 3. The label stays **inside the plot**, which is tested as arithmetic at
+ *    the bottom of this file. An unclamped label runs over the value axis at
+ *    one end of the chart and off the widget at the other, and in Arabic
+ *    those two ends swap — exactly the kind of bug that only shows up in the
  *    language nobody checked.
  */
 
@@ -22,24 +22,19 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { AGENTS, INTENTS } from '../data/dictionaries'
+import { CALLOUT_CHAR_WIDTH, clampCalloutX } from '../charts/callout'
 import { generateDataset } from '../data/generate'
 import { aggregate } from '../engine/aggregate'
-import type { Aggregates, Counts } from '../engine/types'
 import { I18nProvider } from '../i18n/I18nProvider'
-import { ar } from '../i18n/messages.ar'
-import { en } from '../i18n/messages.en'
 import type { UiLang } from '../lib/format'
-import { isoToDayIndex, weekday } from '../lib/time/riyadh'
-import { boundsOf, comparisonRange, defaultRange, type DataBounds } from '../state/presets'
+import { isoToDayIndex } from '../lib/time/riyadh'
+import { boundsOf, comparisonRange, defaultRange } from '../state/presets'
 import { DrillContext } from '../state/drill'
-import { defaultFilterState, type FilterState } from '../state/url'
+import { defaultFilterState } from '../state/url'
 import { DailyTrendWidget } from './DailyTrendWidget'
 import type { WidgetProps } from './types'
 
 const CHART_WIDTH = 900
-/** Room for the value-axis labels; the plot starts after it. See the widget. */
-const GUTTER = 42
 
 let container: HTMLDivElement
 let root: Root
@@ -96,12 +91,6 @@ const calloutTexts = (): SVGTextElement[] =>
   Array.from(container.querySelectorAll<SVGTextElement>('text[data-callout]'))
 
 const calloutLabels = (): string[] => calloutTexts().map((node) => node.textContent ?? '')
-
-/** The same wording the widget uses, per language, without its numbers. */
-const NOTE_PREFIX: Record<UiLang, string> = {
-  en: en['trend.noteIncident'].split('{')[0]!.trim(),
-  ar: ar['trend.noteIncident'].split('{')[0]!.trim(),
-}
 
 // --- the planted quarter ----------------------------------------------------
 
@@ -186,92 +175,44 @@ describe('callouts on the real quarter', () => {
   })
 })
 
-// --- an incident at the very edge -------------------------------------------
-
-const ZERO: Counts = {
-  calls: 0,
-  resolved: 0,
-  transferred: 0,
-  abandoned: 0,
-  toolErrorCalls: 0,
-  toolErrorsSum: 0,
-}
-
-/** A day at a given resolution and tool-error rate. */
-function day(calls: number, resolution: number, toolErrors: number): Counts {
-  const resolved = Math.round(calls * resolution)
-  return {
-    ...ZERO,
-    calls,
-    resolved,
-    transferred: calls - resolved,
-    toolErrorCalls: Math.round(calls * toolErrors),
-    toolErrorsSum: Math.round(calls * toolErrors),
-  }
-}
+// --- the clamp itself -------------------------------------------------------
 
 /**
- * Nine weeks of ordinary days with the last one broken.
+ * Tested as arithmetic rather than through a fixture.
  *
- * The last day is the hard case for the label: it sits at the inline-end edge
- * of the plot, which is the right in English and the left in Arabic.
+ * It used to be provoked by planting an incident on the last day of a series,
+ * which stopped working the moment the detector started refusing to judge
+ * days at the edge of the data — correctly, but it left the clamp untested
+ * and the test asserting that nothing rendered. The placement rule and the
+ * label geometry are unrelated concerns, and coupling them hid both.
  */
-function edgeIncident(): { props: WidgetProps; bounds: DataBounds } {
-  const firstDay = isoToDayIndex('2026-06-28')
-  const length = 63
+describe('keeping a callout inside the plot', () => {
+  const WIDTH = 858 // 900 less the value-axis gutter
+  const label = 'Tool errors 4.7× normal'
+  const half = (label.length * CALLOUT_CHAR_WIDTH) / 2
 
-  const daily = Array.from({ length }, (_, offset) => {
-    const isWeekend = weekday(firstDay + offset) >= 5
-    return day(isWeekend ? 900 : 2200, isWeekend ? 0.62 : 0.72, 0.06)
+  it('leaves a label in the middle where it is', () => {
+    expect(clampCalloutX(400, label, WIDTH)).toBe(400)
   })
-  daily[length - 1] = day(2200, 0.6, 0.3)
 
-  const weekStarts = Array.from({ length: Math.ceil(length / 7) }, (_, w) => firstDay + w * 7)
-  const bounds = boundsOf({ firstDay, days: length })
+  it('pulls a label back from either end', () => {
+    // x = 0 is the inline start, which is the left in English and the right
+    // in Arabic: the chart mirrors its scale, so one rule covers both.
+    expect(clampCalloutX(0, label, WIDTH)).toBeCloseTo(half, 5)
+    expect(clampCalloutX(WIDTH, label, WIDTH)).toBeCloseTo(WIDTH - half, 5)
+  })
 
-  const data: Aggregates = {
-    current: ZERO,
-    previous: ZERO,
-    daily,
-    intents: INTENTS.map(() => ({ current: ZERO, previous: ZERO, weekly: [] })),
-    agents: AGENTS.map(() => ({ current: ZERO, previous: ZERO })),
-    reasons: { current: [0, 0, 0, 0], previous: [0, 0, 0, 0] },
-    heatmap: new Array<number>(7 * 24).fill(0),
-    weekStarts,
-  }
+  it('never lets the text cross the plot edge', () => {
+    for (let x = -50; x <= WIDTH + 50; x += 7) {
+      const clamped = clampCalloutX(x, label, WIDTH)
+      expect(clamped - half).toBeGreaterThanOrEqual(0)
+      expect(clamped + half).toBeLessThanOrEqual(WIDTH)
+    }
+  })
 
-  const filters: FilterState = {
-    ...defaultFilterState(bounds),
-    range: { from: bounds.lastDay - 6, to: bounds.lastDay },
-  }
-
-  return {
-    props: { data, filters, showDelta: true, coverage: 'full', bounds },
-    bounds,
-  }
-}
-
-describe('a callout at the edge of the plot', () => {
-  const innerWidth = CHART_WIDTH - GUTTER
-
-  it.each([['en'], ['ar']] as const)('stays inside the plot in %s', (lang) => {
-    const { props } = edgeIncident()
-    render(props, lang)
-
-    const label = calloutTexts()[0]
-    expect(label).toBeDefined()
-    expect(label!.textContent).toContain(NOTE_PREFIX[lang])
-
-    const x = Number(label!.getAttribute('x'))
-    // The widget's own estimate: 5.4px a character, halved.
-    const halfLabel = ((label!.textContent ?? '').length * 5.4) / 2
-
-    /*
-     * Measured in the plot's own coordinates, which start after the gutter in
-     * English and end before it in Arabic. Staying inside [0, innerWidth]
-     * here is what keeps the text off the value axis either way.
-     */
-    expect(x).toBeGreaterThanOrEqual(halfLabel)
-    expect(x).toBeLessThanOrEqual(innerWidth - halfLabel)
+  it('centres a label too wide to fit rather than clipping one end', () => {
+    const narrow = 40
+    expect(clampCalloutX(0, label, narrow)).toBe(narrow / 2)
+    expect(clampCalloutX(narrow, label, narrow)).toBe(narrow / 2)
   })
 })
