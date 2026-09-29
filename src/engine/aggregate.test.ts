@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import { isoToDayIndex, previousPeriod, weekday } from '../lib/time/riyadh'
+import { isoToDayIndex, weekday } from '../lib/time/riyadh'
+import { comparisonRange } from '../state/presets'
 import { AGENTS, HANDOFF_REASONS, INTENTS, LANGUAGES, OUTCOMES } from '../data/dictionaries'
 import { generateDataset } from '../data/generate'
 import { mulberry32, uniformInt, type Rng } from '../data/prng'
@@ -17,10 +18,16 @@ beforeAll(() => {
 
 const day = (iso: string): number => isoToDayIndex(iso)
 
-/** A query with no filters over the given inclusive ISO date range. */
+/**
+ * A query with no filters over the given inclusive ISO date range.
+ * The comparison defaults to the weekday-aligned one the state layer would
+ * have chosen, so these tests exercise the same shape the app sends.
+ */
 function q(fromISO: string, toISO: string, extra: Partial<Query> = {}): Query {
+  const range = { from: day(fromISO), to: day(toISO) }
   return {
-    range: { from: day(fromISO), to: day(toISO) },
+    range,
+    compare: comparisonRange(range),
     agents: [],
     intents: [],
     languages: [],
@@ -128,6 +135,9 @@ function randomQuery(rng: Rng): Query {
 
   return {
     range: { from, to },
+    // Half the random queries run without a comparison, so the null path is
+    // covered by the differential tests too.
+    compare: rng() < 0.5 ? comparisonRange({ from, to }) : null,
     agents: pickSome(AGENTS.length),
     intents: pickSome(INTENTS.length),
     languages: pickSome(LANGUAGES.length),
@@ -153,15 +163,16 @@ describe('aggregate matches the reference implementation', () => {
 describe('period arithmetic', () => {
   it('compares the last full week against the week before it', () => {
     const range = { from: day('2026-09-20'), to: day('2026-09-26') }
-    const prev = previousPeriod(range)
+    const prev = comparisonRange(range)
     expect(prev.from).toBe(day('2026-09-13'))
     expect(prev.to).toBe(day('2026-09-19'))
   })
 
   it('puts the same number of days in both periods', () => {
     const range = { from: day('2026-09-20'), to: day('2026-09-26') }
-    const prev = previousPeriod(range)
+    const prev = comparisonRange(range)
     expect(prev.to - prev.from).toBe(range.to - range.from)
+    // A 7-day range shifts back exactly 7 days, so the periods are adjacent.
     expect(prev.to).toBe(range.from - 1)
   })
 })
@@ -274,6 +285,7 @@ describe('invariants', () => {
 
     const impossible = aggregate(ds, {
       range: { from: day('2026-09-20'), to: day('2026-09-26') },
+      compare: comparisonRange({ from: day('2026-09-20'), to: day('2026-09-26') }),
       agents: [99],
       intents: [],
       languages: [],

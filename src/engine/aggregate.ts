@@ -13,7 +13,7 @@
  * director would.
  */
 
-import { previousPeriod, startOfWeek, weekday } from '../lib/time/riyadh'
+import { startOfWeek, weekday } from '../lib/time/riyadh'
 import { AGENTS, HANDOFF_REASONS, INTENTS, LANGUAGES, OUTCOMES } from '../data/dictionaries'
 import { NO_HANDOFF, type Dataset } from '../data/types'
 import type {
@@ -153,12 +153,14 @@ function emptyAggregates(ds: Dataset, weekCount: number, weekStarts: number[]): 
 /**
  * Everything the dashboard needs, from one pass over the dataset.
  *
- * The comparison period is always `previousPeriod(q.range)` — the caller does
- * not get to choose, which is what keeps "vs. previous" honest.
+ * The comparison period arrives in the query. When it is `null` the previous
+ * buckets simply stay zero — see the note on {@link Query.compare}.
  */
 export function aggregate(ds: Dataset, q: Query): Aggregates {
   const current = q.range
-  const previous = previousPeriod(current)
+  // An empty range that cannot match any day, so the classifier marks nothing
+  // as PERIOD_PREVIOUS without needing a special case in the hot loop.
+  const previous = q.compare ?? { from: 1, to: 0 }
 
   const agentMask = buildMask(q.agents, AGENTS.length)
   const intentMask = buildMask(q.intents, INTENTS.length)
@@ -208,7 +210,7 @@ export function aggregate(ds: Dataset, q: Query): Aggregates {
 
 /** The day span a drill-down looks at, already clipped to the dataset. */
 function drillDayRange(ds: Dataset, q: Query, t: DrillTarget): { from: number; to: number } {
-  const period = t.period === 'current' ? q.range : previousPeriod(q.range)
+  const period = t.period === 'current' ? q.range : (q.compare ?? { from: 1, to: 0 })
   const lastDay = ds.firstDay + ds.days - 1
 
   // A specific day only matches if it is inside the period to begin with.
@@ -251,6 +253,7 @@ export function drill(ds: Dataset, q: Query, t: DrillTarget): Uint32Array {
     if (t.hour !== undefined && ds.hour[i] !== t.hour) continue
     if (t.weekday !== undefined && weekday(ds.dayIdx[i]!) !== t.weekday) continue
     if (t.hasToolErrors !== undefined && ds.toolErrors[i]! > 0 !== t.hasToolErrors) continue
+    if (t.resolved !== undefined && (ds.outcome[i] === RESOLVED) !== t.resolved) continue
 
     matches.push(i)
   }

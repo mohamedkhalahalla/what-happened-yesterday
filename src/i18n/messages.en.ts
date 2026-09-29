@@ -194,6 +194,77 @@ export const en = {
   'trend.col.toolError': 'Tool-error rate',
   'trend.noCalls': 'No calls',
 
+  'filters.comparingShifted':
+    'Comparing {current} with the same weekdays {weeks} earlier ({previous})',
+  'filters.weeksOne': 'one week',
+  'filters.weeksTwo': 'two weeks',
+  'filters.weeksMany': '{count} weeks',
+  'intents.title': 'Intents',
+  'intents.col.intent': 'Intent',
+  'intents.col.calls': 'Calls',
+  'intents.col.resolution': 'Resolution rate',
+  'intents.col.delta': 'Change',
+  'intents.col.unresolved': 'Unresolved',
+  'intents.col.sparkline': '13-week trend',
+  'intents.col.quarter': 'Quarter trend',
+  'intents.sortBy': 'Sort by {column}',
+  'intents.fewCalls': 'few calls',
+  'intents.declining': 'Declining',
+  'intents.improving': 'Improving',
+  'intents.sparkAria': '{intent}: from {first} to {last} over {weeks} weeks',
+  'intents.sparkAriaEmpty': '{intent}: not enough weekly volume to show a trend',
+  'intents.showCalls': 'Show {intent} calls',
+  'intents.showUnresolved': 'Show unresolved {intent} calls',
+  'intents.caption': 'Intents by unresolved calls',
+  'intents.summary':
+    '{count} intents in this period. {worst} has the most unresolved calls ({unresolved}).',
+  'intents.summaryEmpty': 'No calls match these filters.',
+  'agents.title': 'Agents',
+  'agents.col.agent': 'Agent',
+  'agents.col.transferRate': 'Transfer rate',
+  'agents.col.resolution': 'Resolution rate',
+  'agents.col.calls': 'Calls',
+  'agents.col.delta': 'Change',
+  'agents.median': 'Median {rate}',
+  'agents.aboveMedian': '{ratio}x median',
+  'agents.barAria': '{agent}: transfer rate {rate}, {calls} calls',
+  'agents.showCalls': 'Show calls transferred by {agent}',
+  'agents.caption': 'Transfer rate by agent',
+  'agents.summary':
+    '{count} agents handled calls. The median transfer rate is {median}. {outlier} is highest at {rate}, {ratio} times the median.',
+  'agents.summaryNoOutlier':
+    '{count} agents handled calls. The median transfer rate is {median}, and no agent stands out against it.',
+  'agents.summaryEmpty': 'No calls match these filters.',
+  'reasons.title': 'Failure reasons',
+  'reasons.col.reason': 'Reason',
+  'reasons.col.current': 'This period',
+  'reasons.col.previous': 'Comparison period',
+  'reasons.col.delta': 'Change',
+  'reasons.per100': 'per 100 calls',
+  'reasons.abandoned': 'Abandoned',
+  'reasons.barAria':
+    '{reason}: {current} per 100 calls, against {previous} in the comparison period',
+  'reasons.showCalls': 'Show calls for {reason}',
+  'reasons.caption': 'Failure reasons per 100 calls',
+  'reasons.summary': '{top} is the most common at {rate} per 100 calls. {notable}',
+  'reasons.summaryNotable': '{reason} changed notably against the comparison period ({delta}).',
+  'reasons.summaryNoNotable': 'Nothing changed notably against the comparison period.',
+  'reasons.summaryEmpty': 'No calls match these filters.',
+  'reasons.summaryNoComparison':
+    '{top} is the most common at {rate} per 100 calls. There is no comparison period in this data.',
+  'glossary.per100': 'Per 100 calls',
+  'glossary.per100.def':
+    'A rate rather than a count, so periods with different call volumes can be compared directly.',
+  'glossary.median': 'Median',
+  'glossary.median.def':
+    'The middle value: half the agents are above it and half below. Less distorted by one extreme agent than an average.',
+  'glossary.unresolved': 'Unresolved',
+  'glossary.unresolved.def':
+    'Calls that were transferred to a person or abandoned by the customer, i.e. every call the AI agent did not finish.',
+  'glossary.notable': 'Notable change',
+  'glossary.notable.def':
+    'Larger than sampling noise alone would explain, using a z-test against the comparison period. Not a claim about the cause.',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

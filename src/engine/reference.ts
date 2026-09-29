@@ -16,13 +16,7 @@
  * it) — it is 100× slower and exists purely to be disagreed with.
  */
 
-import {
-  previousPeriod,
-  riyadhDayIndex,
-  riyadhHour,
-  startOfWeek,
-  weekday,
-} from '../lib/time/riyadh'
+import { riyadhDayIndex, riyadhHour, startOfWeek, weekday } from '../lib/time/riyadh'
 import { AGENTS, HANDOFF_REASONS, INTENTS, LANGUAGES, OUTCOMES } from '../data/dictionaries'
 import { getCall } from '../data/getCall'
 import { NO_HANDOFF, type Call, type Dataset } from '../data/types'
@@ -114,7 +108,7 @@ function inRange(dayIndex: number, range: { from: number; to: number }): boolean
 export function reference(ds: Dataset, q: Query): Aggregates {
   const rows = materialise(ds)
   const current = q.range
-  const previous = previousPeriod(current)
+  const previous = q.compare ?? { from: 1, to: 0 }
 
   const firstWeekStart = startOfWeek(ds.firstDay)
   const lastDay = ds.firstDay + ds.days - 1
@@ -183,7 +177,7 @@ export function reference(ds: Dataset, q: Query): Aggregates {
 /** The same row indices as `drill()`, found by filtering materialised rows. */
 export function referenceDrill(ds: Dataset, q: Query, t: DrillTarget): number[] {
   const rows = materialise(ds)
-  const period = t.period === 'current' ? q.range : previousPeriod(q.range)
+  const period = t.period === 'current' ? q.range : (q.compare ?? { from: 1, to: 0 })
 
   return rows
     .filter((row) => {
@@ -197,6 +191,9 @@ export function referenceDrill(ds: Dataset, q: Query, t: DrillTarget): number[] 
       if (t.hour !== undefined && row.hour !== t.hour) return false
       if (t.weekday !== undefined && weekday(row.dayIndex) !== t.weekday) return false
       if (t.hasToolErrors !== undefined && row.call.toolErrors >= 1 !== t.hasToolErrors) {
+        return false
+      }
+      if (t.resolved !== undefined && (row.call.outcome === 'resolved') !== t.resolved) {
         return false
       }
       return true

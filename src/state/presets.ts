@@ -7,7 +7,7 @@
  * after it is generated.
  */
 
-import { previousPeriod, startOfWeek } from '../lib/time/riyadh'
+import { startOfWeek } from '../lib/time/riyadh'
 import type { DayRangeQuery } from '../engine/types'
 
 /** The edges of the world, derived from the dataset itself. */
@@ -92,15 +92,16 @@ export function activePreset(range: DayRangeQuery, bounds: DataBounds): PresetId
 export type ComparisonCoverage = 'full' | 'partial' | 'none'
 
 /**
- * Whether the previous period fits inside the data.
+ * Whether the comparison period fits inside the data.
  *
  * This is the difference between an honest dashboard and a lying one. The
- * quarter preset spans every day there is, so its previous period is entirely
- * before the data starts — comparing against it would read as "−100%", which
- * is not a collapse in service quality, it is the absence of history.
+ * quarter preset spans every day there is, so its comparison period is
+ * entirely before the data starts — comparing against it would read as
+ * "−100%", which is not a collapse in service quality, it is the absence of
+ * history.
  */
 export function comparisonCoverage(range: DayRangeQuery, bounds: DataBounds): ComparisonCoverage {
-  const previous = previousPeriod(range)
+  const previous = comparisonRange(range)
   const overlapFrom = Math.max(previous.from, bounds.firstDay)
   const overlapTo = Math.min(previous.to, bounds.lastDay)
   const overlapDays = Math.max(0, overlapTo - overlapFrom + 1)
@@ -111,7 +112,49 @@ export function comparisonCoverage(range: DayRangeQuery, bounds: DataBounds): Co
   return overlapDays < previousDays ? 'partial' : 'full'
 }
 
-/** The comparison period itself, for labelling. Not clamped — the UI says so. */
+/** Days in an inclusive range. */
+export function rangeLengthOf(range: DayRangeQuery): number {
+  return range.to - range.from + 1
+}
+
+/**
+ * How far back the comparison period sits, in days: always a whole number of
+ * weeks, and always at least as long as the range itself.
+ */
+export function comparisonShift(range: DayRangeQuery): number {
+  return Math.ceil(rangeLengthOf(range) / 7) * 7
+}
+
+/**
+ * The period to compare against: the same length, shifted back a whole number
+ * of weeks.
+ *
+ * **Not** simply "the days immediately before". That is the obvious answer and
+ * it is wrong here, because this business has a weekly rhythm — Friday runs at
+ * 45% of a workday and Saturday at 65%. Comparing 17–26 September (2 Fridays)
+ * with the 10 days before it (1 Friday) reports a volume drop that is purely
+ * an artefact of which weekend days each window happened to contain. That bug
+ * was visible in manual testing as a "notable" change with no cause.
+ *
+ * Shifting by `ceil(length / 7) * 7` guarantees both windows contain the same
+ * multiset of weekdays, so any difference left is about the calls. The cost is
+ * that a 10-day range compares against 14 days earlier rather than 10 — a gap
+ * the UI names out loud rather than hiding.
+ */
 export function comparisonRange(range: DayRangeQuery): DayRangeQuery {
-  return previousPeriod(range)
+  const shift = comparisonShift(range)
+  return { from: range.from - shift, to: range.to - shift }
+}
+
+/**
+ * True when the comparison period is further back than the range is long, so
+ * the label has to explain the gap rather than say "the previous period".
+ */
+export function comparisonIsShifted(range: DayRangeQuery): boolean {
+  return comparisonShift(range) !== rangeLengthOf(range)
+}
+
+/** How many whole weeks back the comparison sits. Used for the label. */
+export function comparisonWeeksBack(range: DayRangeQuery): number {
+  return comparisonShift(range) / 7
 }

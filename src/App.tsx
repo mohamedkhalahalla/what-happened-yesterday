@@ -65,7 +65,7 @@ function Filtered({
 }) {
   const { t } = useI18n()
   const { state, corrections, update } = useFilterState(bounds)
-  const { data, isFetching, workerMs, roundTripMs, error } = useAggregates(client, state)
+  const { data, isFetching, workerMs, roundTripMs, error } = useAggregates(client, state, bounds)
   const {
     layout,
     moveWidget,

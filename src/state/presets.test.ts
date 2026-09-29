@@ -4,6 +4,9 @@ import { dayIndexToISO, isoToDayIndex, weekday } from '../lib/time/riyadh'
 import {
   PRESET_IDS,
   activePreset,
+  comparisonIsShifted,
+  comparisonShift,
+  comparisonWeeksBack,
   boundsOf,
   comparisonCoverage,
   comparisonRange,
@@ -142,12 +145,80 @@ describe('comparisonCoverage', () => {
     expect(comparisonCoverage(range, bounds)).toBe('none')
   })
 
-  it('always names a comparison period of the same length', () => {
+  it('always names a comparison period of the same length, strictly earlier', () => {
     for (const preset of ['lastWeek', 'last30Days', 'quarter'] as const) {
       const range = presetRange(preset, bounds)
       const previous = comparisonRange(range)
+      expect(previous.to - previous.from, preset).toBe(range.to - range.from)
+      // Adjacency is no longer guaranteed: a 30-day range shifts back 35 days
+      // to keep the weekday mix identical, leaving a deliberate 5-day gap.
+      expect(previous.to, preset).toBeLessThan(range.from)
+    }
+  })
+})
+
+describe('comparisonRange is weekday-aligned', () => {
+  /**
+   * The bug this prevents: comparing 17-26 Sept (2 Fridays) against the 10
+   * days immediately before it (1 Friday) reported a "notable" volume drop
+   * that was purely an artefact of the weekend mix. Shifting by whole weeks
+   * makes both windows contain the same weekdays.
+   */
+  const weekdayHistogram = (range: { from: number; to: number }): number[] => {
+    const counts = [0, 0, 0, 0, 0, 0, 0]
+    for (let d = range.from; d <= range.to; d++) counts[weekday(d)]! += 1
+    return counts
+  }
+
+  it('shifts a 7-day range back 7 days', () => {
+    const range = { from: day('2026-09-20'), to: day('2026-09-26') }
+    expect(comparisonShift(range)).toBe(7)
+    expect(comparisonWeeksBack(range)).toBe(1)
+    expect(iso(comparisonRange(range))).toEqual(['2026-09-13', '2026-09-19'])
+    // One week back is adjacent, so no extra explanation is needed.
+    expect(comparisonIsShifted(range)).toBe(false)
+  })
+
+  it('shifts a 10-day range back 14 days, not 10', () => {
+    // This is the exact case from the bug report.
+    const range = { from: day('2026-09-17'), to: day('2026-09-26') }
+    expect(comparisonShift(range)).toBe(14)
+    expect(comparisonWeeksBack(range)).toBe(2)
+    expect(iso(comparisonRange(range))).toEqual(['2026-09-03', '2026-09-12'])
+    // There is now a gap, and the UI has to say so.
+    expect(comparisonIsShifted(range)).toBe(true)
+  })
+
+  it('shifts a 30-day range back 35 days', () => {
+    const range = presetRange('last30Days', bounds)
+    expect(comparisonShift(range)).toBe(35)
+    expect(comparisonWeeksBack(range)).toBe(5)
+    expect(iso(comparisonRange(range))).toEqual(['2026-07-24', '2026-08-22'])
+    expect(comparisonIsShifted(range)).toBe(true)
+  })
+
+  it('gives both periods the same count of every weekday', () => {
+    for (const length of [1, 3, 7, 10, 14, 20, 30, 45, 90]) {
+      const range = { from: day('2026-09-26') - length + 1, to: day('2026-09-26') }
+      const previous = comparisonRange(range)
+
+      expect(weekdayHistogram(previous), `length ${length}`).toEqual(weekdayHistogram(range))
+    }
+  })
+
+  it('keeps both periods the same length', () => {
+    for (const length of [1, 7, 10, 30]) {
+      const range = { from: day('2026-09-26') - length + 1, to: day('2026-09-26') }
+      const previous = comparisonRange(range)
       expect(previous.to - previous.from).toBe(range.to - range.from)
-      expect(previous.to).toBe(range.from - 1)
+      expect(previous.to).toBeLessThan(range.from)
+    }
+  })
+
+  it('never overlaps the range it compares against', () => {
+    for (const length of [1, 5, 10, 30, 90]) {
+      const range = { from: day('2026-09-26') - length + 1, to: day('2026-09-26') }
+      expect(comparisonRange(range).to).toBeLessThan(range.from)
     }
   })
 })

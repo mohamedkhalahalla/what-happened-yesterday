@@ -64,7 +64,7 @@ const thousands = (n: number): string => n.toString().replace(/\B(?=(\d{3})+(?!\
 type Scenario = { name: string; query: Query }
 
 function scenarios(): Scenario[] {
-  const base = { agents: [], intents: [], languages: [] }
+  const base = { compare: null, agents: [], intents: [], languages: [] }
   const arabic = LANGUAGES.indexOf('ar')
 
   return [
@@ -80,6 +80,7 @@ function scenarios(): Scenario[] {
       name: 'Single agent, 90 days',
       query: {
         range: { from: day('2026-06-29'), to: day('2026-09-26') },
+        compare: null,
         agents: [5],
         intents: [],
         languages: [],
@@ -89,6 +90,7 @@ function scenarios(): Scenario[] {
       name: 'Single intent + Arabic, 90 days',
       query: {
         range: { from: day('2026-06-29'), to: day('2026-09-26') },
+        compare: null,
         agents: [],
         intents: [intentCode('roaming')],
         languages: [arabic],
@@ -98,6 +100,7 @@ function scenarios(): Scenario[] {
       name: 'Heavy: 3 agents + 10 intents + 2 languages',
       query: {
         range: { from: day('2026-06-29'), to: day('2026-09-26') },
+        compare: null,
         agents: [0, 3, 5],
         intents: INTENTS.slice(0, 10).map((_, i) => i),
         languages: [arabic, LANGUAGES.indexOf('en')],
@@ -191,6 +194,7 @@ function main(): void {
       name: 'All rows in the last week',
       query: {
         range: { from: day('2026-09-20'), to: day('2026-09-26') },
+        compare: null,
         agents: [],
         intents: [],
         languages: [],
@@ -201,6 +205,7 @@ function main(): void {
       name: 'Roaming + transferred, whole quarter',
       query: {
         range: { from: day('2026-06-29'), to: day('2026-09-26') },
+        compare: null,
         agents: [],
         intents: [],
         languages: [],

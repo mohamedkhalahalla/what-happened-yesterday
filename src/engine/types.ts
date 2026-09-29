@@ -15,15 +15,26 @@
 export type DayRangeQuery = { from: number; to: number }
 
 /**
- * Everything the user can ask for. The comparison period is never part of the
- * query: it is always `previousPeriod(range)`, so "vs. previous" is free and
- * cannot drift out of sync with the selected range.
+ * Everything the user can ask for.
+ *
+ * `compare` is passed in rather than derived. The engine used to call
+ * `previousPeriod(range)` itself, which hard-coded "the days immediately
+ * before" into the layer least able to know whether that is the right
+ * question. It is not: this business has a weekly rhythm, so the comparison
+ * has to be weekday-aligned. That decision belongs to the state layer, which
+ * also knows whether the reader asked for a comparison at all.
+ *
+ * `null` means no comparison — either switched off, or there is no history to
+ * compare against. The engine then reports zeroed `previous` counts, which is
+ * honest: nothing was counted, because nothing was asked for.
  *
  * An empty filter array means "no filter on this dimension", not "match
  * nothing" — that is what makes the default query cheap to express.
  */
 export type Query = {
   range: DayRangeQuery
+  /** The period to compare against, or `null` for no comparison. */
+  compare: DayRangeQuery | null
   /** Codes into AGENTS; empty = all agents. */
   agents: number[]
   /** Codes into INTENTS; empty = all intents. */
@@ -108,4 +119,6 @@ export type DrillTarget = {
   /** Riyadh hour, 0..23. */
   hour?: number
   hasToolErrors?: boolean
+  /** True for resolved calls only, false for unresolved (transferred or abandoned). */
+  resolved?: boolean
 }

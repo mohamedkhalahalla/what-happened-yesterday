@@ -26,7 +26,8 @@ import { chartDirection } from '../charts/direction'
 import { RAMADAN } from '../data/config'
 import { useI18n } from '../i18n/useI18n'
 import { formatDay, formatInt, formatPercent, formatWeekdayShort } from '../lib/format'
-import { isoToDayIndex, previousPeriod, weekday } from '../lib/time/riyadh'
+import { isoToDayIndex, weekday } from '../lib/time/riyadh'
+import { comparisonRange } from '../state/presets'
 import { useDrill } from '../state/drill'
 import {
   LOW_VOLUME_THRESHOLD,
@@ -66,7 +67,8 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
     () => ({ from: isoToDayIndex(RAMADAN.fromISO), to: isoToDayIndex(RAMADAN.toISO) }),
     [],
   )
-  const previous = useMemo(() => previousPeriod(filters.range), [filters.range])
+  // The weekday-aligned comparison, not merely the days before.
+  const previous = useMemo(() => comparisonRange(filters.range), [filters.range])
 
   /** Sundays, for the time axis. */
   const sundays = useMemo(

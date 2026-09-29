@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { EngineClient } from '../engine/client'
+import { comparisonCoverage, comparisonRange, type DataBounds } from './presets'
 import type { Aggregates, Query } from '../engine/types'
 import type { FilterState } from './url'
 
@@ -33,17 +34,31 @@ export type AggregatesHandle = {
   error: string | null
 }
 
-/** The engine query implied by a filter state. `compare` is a UI concern. */
-export function queryOf(state: FilterState): Query {
+/**
+ * The engine query implied by a filter state and the data it runs against.
+ *
+ * The comparison range is resolved here rather than in the engine, because
+ * this is the layer that knows both the weekly rhythm (so the comparison must
+ * be weekday-aligned) and whether the reader asked for a comparison at all.
+ * `null` when comparison is off, or when there is no history to compare with.
+ */
+export function queryOf(state: FilterState, bounds: DataBounds): Query {
+  const wanted = state.compare && comparisonCoverage(state.range, bounds) !== 'none'
+
   return {
     range: state.range,
+    compare: wanted ? comparisonRange(state.range) : null,
     agents: state.agents,
     intents: state.intents,
     languages: state.languages,
   }
 }
 
-export function useAggregates(client: EngineClient | null, state: FilterState): AggregatesHandle {
+export function useAggregates(
+  client: EngineClient | null,
+  state: FilterState,
+  bounds: DataBounds,
+): AggregatesHandle {
   const [data, setData] = useState<Aggregates | null>(null)
   const [isFetching, setIsFetching] = useState(false)
   const [timings, setTimings] = useState({ workerMs: 0, roundTripMs: 0 })
@@ -57,7 +72,7 @@ export function useAggregates(client: EngineClient | null, state: FilterState): 
    * ref written during render and no chance of a refetch loop if a caller
    * hands us a new object each time.
    */
-  const queryKey = JSON.stringify(queryOf(state))
+  const queryKey = JSON.stringify(queryOf(state, bounds))
   const query = useMemo(() => JSON.parse(queryKey) as Query, [queryKey])
 
   useEffect(() => {

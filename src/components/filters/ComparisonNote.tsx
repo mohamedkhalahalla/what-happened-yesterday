@@ -8,9 +8,14 @@
  */
 
 import { useI18n } from '../../i18n/useI18n'
-import { formatDayRange } from '../../lib/format'
+import { formatDayRange, formatInt } from '../../lib/format'
 import type { DayRangeQuery } from '../../engine/types'
-import { comparisonRange, type ComparisonCoverage } from '../../state/presets'
+import {
+  comparisonIsShifted,
+  comparisonRange,
+  comparisonWeeksBack,
+  type ComparisonCoverage,
+} from '../../state/presets'
 
 export type ComparisonNoteProps = {
   range: DayRangeQuery
@@ -25,6 +30,28 @@ export function ComparisonNote({ range, coverage, compare }: ComparisonNoteProps
   const current = formatDayRange(lang, range.from, range.to)
   const previous = comparisonRange(range)
   const previousLabel = formatDayRange(lang, previous.from, previous.to)
+
+  /**
+   * When the comparison sits further back than the range is long — a 10-day
+   * range compares against 14 days earlier, to keep the weekday mix identical
+   * — the gap is deliberate and has to be said out loud. A reader who works
+   * out for themselves that the dates do not abut will assume a bug.
+   */
+  const weeksBack = comparisonWeeksBack(range)
+  const weeksLabel =
+    weeksBack === 1
+      ? t('filters.weeksOne')
+      : weeksBack === 2
+        ? t('filters.weeksTwo')
+        : t('filters.weeksMany', { count: formatInt(lang, weeksBack) })
+
+  const comparingSentence = comparisonIsShifted(range)
+    ? t('filters.comparingShifted', {
+        current,
+        weeks: weeksLabel,
+        previous: previousLabel,
+      })
+    : t('filters.comparing', { current, previous: previousLabel })
 
   if (!compare) {
     return (
@@ -45,7 +72,7 @@ export function ComparisonNote({ range, coverage, compare }: ComparisonNoteProps
 
   return (
     <p className="text-[12.5px] text-muted-foreground">
-      {t('filters.comparing', { current, previous: previousLabel })}
+      {comparingSentence}
       {coverage === 'partial' && (
         <>
           {' · '}
