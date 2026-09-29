@@ -35,7 +35,20 @@ export default defineConfig({
   fullyParallel: false,
   // Locally a failure means "look at it", not "try again until it passes".
   retries: 0,
+  /*
+   * Generous, because every navigation costs a 200,000-row dataset built in a
+   * worker. The default 30s is a budget for a page that only has to paint, and
+   * the last test in a serial run was hitting it on a warm-but-busy machine.
+   */
+  timeout: 60_000,
   reporter: [['list']],
+  /*
+   * The screenshot spec is a tool, not a test — it drives the app into a few
+   * states and writes PNGs, and it is skipped unless it was asked for.
+   * `npm run test:e2e:shots` sets the flag; a CLI `--grep` cannot lift a
+   * `grepInvert` from the config, so the switch has to live here.
+   */
+  grepInvert: process.env.SHOTS === '1' ? undefined : /@screenshots/,
 
   use: {
     baseURL: BASE_URL,
