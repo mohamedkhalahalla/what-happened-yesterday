@@ -357,6 +357,21 @@ describe('drill', () => {
       target: { period: 'current', hasToolErrors: false },
     },
     {
+      name: 'resolved calls only',
+      query: q(LAST_WEEK.fromISO, LAST_WEEK.toISO),
+      target: { period: 'current', resolved: true },
+    },
+    {
+      name: 'unresolved calls only',
+      query: q(LAST_WEEK.fromISO, LAST_WEEK.toISO),
+      target: { period: 'current', resolved: false },
+    },
+    {
+      name: 'unresolved calls for one intent',
+      query: q(ALL_DAYS.fromISO, ALL_DAYS.toISO),
+      target: { period: 'current', intent: intentCode('roaming'), resolved: false },
+    },
+    {
       name: 'a drill that also honours the query filters',
       query: q(ALL_DAYS.fromISO, ALL_DAYS.toISO, {
         agents: [agentCode('agent_06')],
@@ -381,6 +396,20 @@ describe('drill', () => {
       expect(t).toBeGreaterThanOrEqual(previous)
       previous = t
     }
+  })
+
+  it('splits a period cleanly into resolved and unresolved', () => {
+    const query = q(LAST_WEEK.fromISO, LAST_WEEK.toISO)
+    const a = aggregate(ds, query)
+
+    const resolved = drill(ds, query, { period: 'current', resolved: true })
+    const unresolved = drill(ds, query, { period: 'current', resolved: false })
+
+    // Unresolved is exactly "transferred or abandoned" — the two partition the
+    // period with nothing double-counted and nothing lost.
+    expect(resolved.length).toBe(a.current.resolved)
+    expect(unresolved.length).toBe(a.current.transferred + a.current.abandoned)
+    expect(resolved.length + unresolved.length).toBe(a.current.calls)
   })
 
   it('agrees with the aggregate it drills into', () => {

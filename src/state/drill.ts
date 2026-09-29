@@ -35,6 +35,8 @@ export type DrillConstraints = {
   /** Riyadh hour, 0..23. */
   hour?: number
   hasToolErrors?: boolean
+  /** True for resolved calls only, false for unresolved ones. */
+  resolved?: boolean
 }
 
 export type DrillRequest = {
