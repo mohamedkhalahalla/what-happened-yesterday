@@ -61,6 +61,18 @@ const INITIAL_RECT = { width: 900, height: 600 }
 /** Shown where a column has nothing to report for this call. */
 const EM_DASH = '—'
 
+/**
+ * The table is never narrower than its columns' floors added together.
+ *
+ * `fit-content` rather than a number, so the floor is whatever the tracks
+ * below actually ask for and a constant cannot drift away from them. Above it
+ * every column gets its share of the space; below it — a phone, or the panel
+ * at its narrowest — the columns keep their floors and the *table* scrolls
+ * sideways. The page never does: a dashboard that slides under your thumb
+ * because one panel is too wide is a broken dashboard, not a wide table.
+ */
+const TABLE_MIN_WIDTH = 'fit-content'
+
 const AGENT_IDS: readonly string[] = AGENTS.map((agent) => agent.id)
 const INTENT_IDS: readonly string[] = INTENTS.map((intent) => intent.id)
 
@@ -71,12 +83,19 @@ type Column = {
   sort?: SortKey
   numeric?: boolean
   /**
-   * Fraction of the table width. Declared once and used by both the header
-   * and the body: two lists of widths drift the moment a column is added,
-   * and a header that no longer lines up with its cells is worse than no
-   * header.
+   * The column's grid track: `minmax(floor, share)`.
+   *
+   * Declared once and used by the header and every body row, because two
+   * lists of widths drift the moment a column is added and a header that no
+   * longer lines up with its cells is worse than no header.
+   *
+   * They used to be percentages, and they summed to 106% — so the last column
+   * hung off the end of the panel in both languages. Percentages of a width
+   * nobody had measured could only ever add up by accident; tracks cannot
+   * overflow their container, and `fr` shares out whatever space is left
+   * after every column has its floor.
    */
-  width: string
+  track: string
   /** Renders the cell for one call. `muted` columns are context, not answer. */
   cell: (call: Call, lang: UiLang) => string
   muted?: boolean
@@ -87,7 +106,7 @@ const COLUMNS: Column[] = [
     key: 'time',
     labelKey: 'calls.col.time',
     sort: 'time',
-    width: '16%',
+    track: 'minmax(6.5rem, 1.4fr)',
     muted: true,
     cell: (call, lang) => formatInstant(lang, Date.parse(call.startedAt) / 1000),
   },
@@ -95,21 +114,21 @@ const COLUMNS: Column[] = [
     key: 'agent',
     labelKey: 'calls.col.agent',
     sort: 'agent',
-    width: '11%',
+    track: 'minmax(4.5rem, 1fr)',
     cell: (call, lang) => agentName(lang, AGENT_IDS.indexOf(call.agentId)),
   },
   {
     key: 'intent',
     labelKey: 'calls.col.intent',
     sort: 'intent',
-    width: '17%',
+    track: 'minmax(7rem, 1.7fr)',
     cell: (call, lang) => intentLabel(lang, INTENT_IDS.indexOf(call.intent)),
   },
   {
     key: 'language',
     labelKey: 'calls.col.language',
     sort: 'language',
-    width: '9%',
+    track: 'minmax(3.75rem, 0.9fr)',
     muted: true,
     cell: (call, lang) => languageLabel(lang, LANGUAGES.indexOf(call.language)),
   },
@@ -118,14 +137,14 @@ const COLUMNS: Column[] = [
     key: 'outcome',
     labelKey: 'calls.col.outcome',
     sort: 'outcome',
-    width: '11%',
+    track: 'minmax(5.25rem, 1.1fr)',
     cell: (call, lang) => outcomeLabel(lang, OUTCOMES.indexOf(call.outcome)),
   },
   {
     key: 'handoff',
     labelKey: 'calls.col.handoff',
     sort: 'handoff',
-    width: '13%',
+    track: 'minmax(6.5rem, 1.3fr)',
     muted: true,
     cell: (call, lang) =>
       call.handoffReason === undefined
@@ -137,7 +156,7 @@ const COLUMNS: Column[] = [
     labelKey: 'calls.col.duration',
     sort: 'duration',
     numeric: true,
-    width: '10%',
+    track: 'minmax(5rem, 1fr)',
     cell: (call, lang) => formatDurationSec(lang, call.durationSec),
   },
   {
@@ -145,7 +164,7 @@ const COLUMNS: Column[] = [
     labelKey: 'calls.col.sentiment',
     sort: 'sentimentChange',
     numeric: true,
-    width: '11%',
+    track: 'minmax(6.5rem, 1.1fr)',
     muted: true,
     cell: (call, lang) => formatSentimentPair(lang, call.sentimentStart, call.sentimentEnd),
   },
@@ -154,7 +173,7 @@ const COLUMNS: Column[] = [
     labelKey: 'calls.col.toolErrors',
     sort: 'toolErrors',
     numeric: true,
-    width: '8%',
+    track: 'minmax(4.25rem, 0.8fr)',
     cell: (call, lang) => (call.toolErrors === 0 ? EM_DASH : formatInt(lang, call.toolErrors)),
   },
 ]
@@ -209,8 +228,7 @@ export function CallsTable({ ds, rows, sortKey, sortDirection, onSort }: CallsTa
         key={column.key}
         role="columnheader"
         aria-sort={active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-        style={{ inlineSize: column.width }}
-        className={`shrink-0 px-2 py-1.5 text-[11px] font-medium ${
+        className={`min-w-0 px-2 py-1.5 text-[11px] font-medium ${
           column.numeric === true ? 'text-end' : 'text-start'
         }`}
       >
@@ -233,6 +251,9 @@ export function CallsTable({ ds, rows, sortKey, sortDirection, onSort }: CallsTa
     )
   }
 
+  /** One template, shared by the header and every row: the only alignment. */
+  const template = COLUMNS.map((column) => column.track).join(' ')
+
   return (
     <div
       role="table"
@@ -240,60 +261,88 @@ export function CallsTable({ ds, rows, sortKey, sortDirection, onSort }: CallsTa
       aria-label={t('calls.tableLabel')}
       className="flex h-full flex-col"
     >
-      <div role="row" aria-rowindex={1} className="flex shrink-0 border-b border-border bg-card">
-        {COLUMNS.map(headerCell)}
-      </div>
-
       {rows.length === 0 ? (
-        <p className="px-4 py-8 text-center text-[12.5px] text-muted-foreground">
-          {t('calls.empty')}
-        </p>
+        <>
+          <div
+            role="row"
+            aria-rowindex={1}
+            className="grid border-b border-border bg-card"
+            style={{ gridTemplateColumns: template }}
+          >
+            {COLUMNS.map(headerCell)}
+          </div>
+          <p className="px-4 py-8 text-center text-[12.5px] text-muted-foreground">
+            {t('calls.empty')}
+          </p>
+        </>
       ) : (
+        /*
+         * One scroll container for both axes, with the header inside it.
+         * The header used to sit outside, which was invisible until the table
+         * was narrow enough to scroll sideways — and then the header stayed
+         * put while the rows moved under it.
+         */
         <div
           ref={scrollRef}
           tabIndex={0}
           aria-label={t('calls.scrollLabel')}
           className="min-h-0 flex-1 overflow-auto focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <div style={{ blockSize: virtualizer.getTotalSize(), position: 'relative' }}>
-            {items.map((item) => {
-              const row = rows[item.index]
-              if (row === undefined) return null
-              // The spec's contract: one Call per visible row, and nothing
-              // reaches around it into the raw columns.
-              const call = getCall(ds, row)
+          <div style={{ minInlineSize: TABLE_MIN_WIDTH }}>
+            <div
+              role="row"
+              aria-rowindex={1}
+              /*
+               * Sticky, so the column names survive scrolling a hundred
+               * thousand rows — the one thing that makes a long table
+               * readable rather than merely long.
+               */
+              className="sticky top-0 z-10 grid border-b border-border bg-card"
+              style={{ gridTemplateColumns: template }}
+            >
+              {COLUMNS.map(headerCell)}
+            </div>
 
-              return (
-                <div
-                  key={item.key}
-                  role="row"
-                  // Real position in the full list, not in the rendered window.
-                  aria-rowindex={item.index + 2}
-                  style={{
-                    position: 'absolute',
-                    insetInlineStart: 0,
-                    insetBlockStart: 0,
-                    inlineSize: '100%',
-                    blockSize: ROW_HEIGHT,
-                    transform: `translateY(${item.start}px)`,
-                  }}
-                  className="flex items-center border-b border-border/60 text-[11.5px]"
-                >
-                  {COLUMNS.map((column) => (
-                    <div
-                      key={column.key}
-                      role="cell"
-                      style={{ inlineSize: column.width }}
-                      className={`shrink-0 truncate px-2 ${
-                        column.numeric === true ? 'text-end tabular-nums' : 'text-start'
-                      } ${column.muted === true ? 'text-muted-foreground' : 'text-foreground'}`}
-                    >
-                      {column.cell(call, lang)}
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
+            <div style={{ blockSize: virtualizer.getTotalSize(), position: 'relative' }}>
+              {items.map((item) => {
+                const row = rows[item.index]
+                if (row === undefined) return null
+                // The spec's contract: one Call per visible row, and nothing
+                // reaches around it into the raw columns.
+                const call = getCall(ds, row)
+
+                return (
+                  <div
+                    key={item.key}
+                    role="row"
+                    // Real position in the full list, not in the rendered window.
+                    aria-rowindex={item.index + 2}
+                    style={{
+                      position: 'absolute',
+                      insetInlineStart: 0,
+                      insetBlockStart: 0,
+                      inlineSize: '100%',
+                      blockSize: ROW_HEIGHT,
+                      transform: `translateY(${item.start}px)`,
+                      gridTemplateColumns: template,
+                    }}
+                    className="grid items-center border-b border-border/60 text-[11.5px]"
+                  >
+                    {COLUMNS.map((column) => (
+                      <div
+                        key={column.key}
+                        role="cell"
+                        className={`min-w-0 truncate px-2 ${
+                          column.numeric === true ? 'text-end tabular-nums' : 'text-start'
+                        } ${column.muted === true ? 'text-muted-foreground' : 'text-foreground'}`}
+                      >
+                        {column.cell(call, lang)}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
