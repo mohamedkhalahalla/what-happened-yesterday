@@ -11,6 +11,7 @@ import {
   formatInt,
   formatPercent,
   formatPointsDelta,
+  formatSignificant,
   formatWeekdayShort,
   isolate,
   type UiLang,
@@ -239,5 +240,29 @@ describe('time-zone independence', () => {
 describe('isolate', () => {
   it('wraps text in FSI…PDI', () => {
     expect(isolate('x')).toBe(`${FSI}x${PDI}`)
+  })
+})
+
+describe('formatSignificant', () => {
+  it('rounds an estimate to two significant figures', () => {
+    // The third digit of a projected weekly figure is noise with a decimal
+    // point in front of it.
+    expect(formatSignificant('en', 463.2)).toBe('460')
+    expect(formatSignificant('en', 1247)).toBe('1,200')
+    expect(formatSignificant('en', 12)).toBe('12')
+  })
+
+  it('keeps the decimals a small number needs', () => {
+    expect(formatSignificant('en', 4.63)).toBe('4.6')
+    expect(formatSignificant('en', 0.472)).toBe('0.47')
+  })
+
+  it('says zero rather than nothing', () => {
+    expect(formatSignificant('en', 0)).toBe('0')
+    expect(formatSignificant('en', Number.NaN)).toBe('0')
+  })
+
+  it('formats in Arabic with Latin digits, like every other number', () => {
+    expect(formatSignificant('ar', 463.2)).toBe('460')
   })
 })

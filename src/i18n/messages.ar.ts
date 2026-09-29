@@ -300,6 +300,54 @@ export const ar: Record<MessageKey, string> = {
     'عوامل تصفية اللوحة تستبعد هذا الاختيار، فلا يوجد ما يُعرض. امسح عوامل التصفية أو عدّلها لتشمله.',
   'drill.toolErrorsOnly': 'مع أخطاء في الأنظمة',
 
+  'widget.fixFirst.title': 'ابدأ بإصلاح هذه',
+  'widget.fixFirst.description':
+    'ما يكلّف أكبر عدد من المكالمات الآن، والأيام التي تعطّل فيها شيء ما.',
+  'fixFirst.ongoing': 'مستمرة',
+  'fixFirst.incidents': 'أعطال',
+  'fixFirst.empty': 'لا شيء لافت في هذا العرض.',
+  'fixFirst.showAll': 'عرض الكل ({count})',
+  'fixFirst.showFewer': 'عرض أقل',
+  'fixFirst.showCalls': 'عرض المكالمات',
+  'fixFirst.showCallsFor': 'عرض المكالمات وراء: {headline}',
+  'fixFirst.footer': 'مُستخرَجة تلقائيًا من هذه البيانات. راجع المكالمات قبل اتخاذ أي إجراء.',
+  'fixFirst.tag.agent': 'وكيل',
+  'fixFirst.tag.intent': 'نوع طلب',
+  'fixFirst.tag.incident': 'عطل',
+  'fixFirst.agent.headline': '{agent} يحوّل {ratio} ضعف الوسيط',
+  'fixFirst.agent.evidence': '{rate} مقابل وسيط {median}، على {calls} مكالمة',
+  'fixFirst.agent.impact': '≈ {count} تحويلة إضافية أسبوعيًا',
+  'fixFirst.intent.headline': '{intent} يتراجع طوال الربع',
+  'fixFirst.intent.evidence':
+    '{recentRate} في الأسابيع الأربعة الأخيرة، و{earlyRate} في الأربعة الأولى',
+  'fixFirst.intent.impact': '≈ {count} مكالمة غير محلولة إضافية أسبوعيًا',
+  'fixFirst.incident.headlineToolErrors': '{date}: أخطاء الأنظمة {ratio} ضعف المعتاد',
+  'fixFirst.incident.headlineResolution': '{date}: انخفضت نسبة الحل {points}',
+  'fixFirst.incident.headlineRange': '{range}: أخطاء الأنظمة {ratio} ضعف المعتاد',
+  'fixFirst.incident.evidenceToolErrors':
+    'أخطاء الأنظمة {rate} مقابل {baseline} في {weekday} معتاد',
+  'fixFirst.incident.evidenceResolution': 'نسبة الحل {rate} مقابل {baseline} في {weekday} معتاد',
+  'fixFirst.incident.quiet': 'لم يتكرر يوم مشابه خلال {days} يومًا منذ ذلك الحين.',
+  'fixFirst.incident.impact': '≈ {count} مكالمة أخفقت في ذلك اليوم',
+  'fixFirst.incident.impactRange': '≈ {count} مكالمة أخفقت خلال تلك الأيام',
+  'trend.note': 'ملاحظة',
+  'trend.noteIncident': 'أخطاء الأنظمة {ratio} ضعف المعتاد',
+  'trend.noteIncidentResolution': 'نسبة الحل أقل من المعتاد بـ {points}',
+  'trend.summaryIncidents': 'يوم واحد ({count}) مُصنَّف كعطل: {days}.',
+  'trend.summaryIncidentsPlural': '{count} أيام مُصنَّفة كأعطال: {days}.',
+  'glossary.outlierAgent': 'وكيل شاذ',
+  'glossary.outlierAgent.def':
+    'وكيل نسبة تحويله لا تقل عن ١٫٥ ضعف وسيط الوكلاء المعروضين، بفارق أكبر مما يفسّره تباين العينة.',
+  'glossary.decliningIntent': 'نوع طلب متراجع',
+  'glossary.decliningIntent.def':
+    'نوع طلب انخفضت نسبة حله في الأسابيع الأربعة الأخيرة انخفاضًا مؤثرًا مقارنة بالأسابيع الأربعة الأولى.',
+  'glossary.incidentDay': 'يوم عطل',
+  'glossary.incidentDay.def':
+    'يوم تخرج فيه أخطاء الأنظمة أو نسبة الحل بعيدًا عما يبدو عليه اليوم نفسه من الأسبوع في بقية أسابيع الربع.',
+  'glossary.impact': 'الأثر',
+  'glossary.impact.def':
+    'المكالمات التي أخفقت زيادةً على ما يتوقعه الأساس الخاص بهذا البند. تقدير مُقرَّب إلى رقمين.',
+
   'perf.readout':
     'احتُسبت خلال {worker} مللي ثانية (العامل) · {roundTrip} مللي ثانية ذهابًا وإيابًا',
 }

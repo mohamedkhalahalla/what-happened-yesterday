@@ -29,6 +29,10 @@ export type GlossaryTermId =
   | 'unresolved'
   | 'notable'
   | 'whyFlagged'
+  | 'outlierAgent'
+  | 'decliningIntent'
+  | 'incidentDay'
+  | 'impact'
 
 export type GlossaryTerm = {
   id: GlossaryTermId
@@ -37,6 +41,32 @@ export type GlossaryTerm = {
 }
 
 export const GLOSSARY: Record<GlossaryTermId, GlossaryTerm> = {
+  /*
+   * The three detector definitions. These matter more than the metric ones:
+   * a reader can disagree with "resolution rate" and still trust the number,
+   * but a finding the dashboard volunteered is one they cannot check at all
+   * unless they are told what rule produced it.
+   */
+  outlierAgent: {
+    id: 'outlierAgent',
+    termKey: 'glossary.outlierAgent',
+    definitionKey: 'glossary.outlierAgent.def',
+  },
+  decliningIntent: {
+    id: 'decliningIntent',
+    termKey: 'glossary.decliningIntent',
+    definitionKey: 'glossary.decliningIntent.def',
+  },
+  incidentDay: {
+    id: 'incidentDay',
+    termKey: 'glossary.incidentDay',
+    definitionKey: 'glossary.incidentDay.def',
+  },
+  impact: {
+    id: 'impact',
+    termKey: 'glossary.impact',
+    definitionKey: 'glossary.impact.def',
+  },
   resolved: {
     id: 'resolved',
     termKey: 'glossary.resolved',

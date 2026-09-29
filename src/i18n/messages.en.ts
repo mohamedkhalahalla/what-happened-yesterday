@@ -309,6 +309,54 @@ export const en = {
     'The dashboard filters exclude this selection, so there is nothing to show. Clear the filters, or change them to include it.',
   'drill.toolErrorsOnly': 'With tool errors',
 
+  'widget.fixFirst.title': 'Fix first',
+  'widget.fixFirst.description':
+    'What is costing the most calls right now, and the one-off days something broke.',
+  'fixFirst.ongoing': 'Ongoing',
+  'fixFirst.incidents': 'Incidents',
+  'fixFirst.empty': 'Nothing stands out in this view.',
+  'fixFirst.showAll': 'Show all {count}',
+  'fixFirst.showFewer': 'Show fewer',
+  'fixFirst.showCalls': 'Show calls',
+  'fixFirst.showCallsFor': 'Show the calls behind: {headline}',
+  'fixFirst.footer': 'Detected automatically from this data. Check the calls before acting.',
+  'fixFirst.tag.agent': 'Agent',
+  'fixFirst.tag.intent': 'Intent',
+  'fixFirst.tag.incident': 'Incident',
+  'fixFirst.agent.headline': '{agent} transfers {ratio}× the median',
+  'fixFirst.agent.evidence': '{rate} vs {median} median, over {calls} calls',
+  'fixFirst.agent.impact': '≈ {count} extra transfers a week',
+  'fixFirst.intent.headline': '{intent} has been getting worse all quarter',
+  'fixFirst.intent.evidence': '{recentRate} in the last four weeks, {earlyRate} in the first four',
+  'fixFirst.intent.impact': '≈ {count} extra unresolved calls a week',
+  'fixFirst.incident.headlineToolErrors': '{date}: tool errors {ratio}× normal',
+  'fixFirst.incident.headlineResolution': '{date}: resolution fell {points}',
+  'fixFirst.incident.headlineRange': '{range}: tool errors {ratio}× normal',
+  'fixFirst.incident.evidenceToolErrors':
+    'Tool errors {rate} against {baseline} on a normal {weekday}',
+  'fixFirst.incident.evidenceResolution':
+    'Resolution {rate} against {baseline} on a normal {weekday}',
+  'fixFirst.incident.quiet': 'No similar day in the {days} days since.',
+  'fixFirst.incident.impact': '≈ {count} calls failed that day',
+  'fixFirst.incident.impactRange': '≈ {count} calls failed across those days',
+  'trend.note': 'Note',
+  'trend.noteIncident': 'Tool errors {ratio}× normal',
+  'trend.noteIncidentResolution': 'Resolution {points} below normal',
+  'trend.summaryIncidents': '{count} day flagged as an incident: {days}.',
+  'trend.summaryIncidentsPlural': '{count} days flagged as incidents: {days}.',
+  'glossary.outlierAgent': 'Outlier agent',
+  'glossary.outlierAgent.def':
+    'An agent whose transfer rate is at least 1.5× the median of the agents in view, by more than sampling noise could explain.',
+  'glossary.decliningIntent': 'Declining intent',
+  'glossary.decliningIntent.def':
+    'An intent that resolved materially worse in the last four full weeks than it did in the first four.',
+  'glossary.incidentDay': 'Incident day',
+  'glossary.incidentDay.def':
+    'A day whose tool errors or resolution are far outside what the same weekday looks like in every other week of the quarter.',
+  'glossary.impact': 'Impact',
+  'glossary.impact.def':
+    'Calls that failed beyond what the thing being measured would normally produce. An estimate, rounded to two figures.',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

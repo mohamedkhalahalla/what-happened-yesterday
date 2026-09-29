@@ -133,6 +133,30 @@ export function formatDecimal(lang: UiLang, value: number, digits = 1): string {
   }).format(value)
 }
 
+/**
+ * A number rounded to `digits` significant figures: `463` → `460`, `4.63` → `4.6`.
+ *
+ * For estimates, and only for estimates. "≈ 463 extra transfers a week" is a
+ * lie told by the last digit: the number is a rate multiplied by a projection,
+ * and the third figure of it is noise dressed as precision. Rounding to two
+ * makes the estimate look like one, which is the honest presentation of a
+ * quantity nobody should plan to the unit.
+ */
+export function formatSignificant(lang: UiLang, value: number, digits = 2): string {
+  if (!Number.isFinite(value) || value === 0) return formatInt(lang, 0)
+
+  const magnitude = Math.floor(Math.log10(Math.abs(value)))
+  const step = Math.pow(10, magnitude - (digits - 1))
+  const rounded = Math.round(value / step) * step
+
+  // Below the rounding step there is a fractional part worth showing: 4.6, not 5.
+  const decimals = Math.max(0, digits - 1 - magnitude)
+  return numberFormat(lang, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(rounded)
+}
+
 /** Shortened for tight spaces: `15.6K` / `15.6 ألف`. */
 export function formatCompact(lang: UiLang, value: number): string {
   return numberFormat(lang, { notation: 'compact', maximumFractionDigits: 1 }).format(value)

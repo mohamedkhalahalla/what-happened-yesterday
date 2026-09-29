@@ -19,11 +19,13 @@ import type { GlossaryTermId } from './glossary'
 import { AgentComparisonWidget } from './AgentComparisonWidget'
 import { DailyTrendWidget } from './DailyTrendWidget'
 import { FailureReasonsWidget } from './FailureReasonsWidget'
+import { FixFirstWidget } from './FixFirstWidget'
 import { IntentTableWidget } from './IntentTableWidget'
 import { KpisWidget } from './KpisWidget'
 import type { WidgetProps } from './types'
 
-export type WidgetId = 'kpis' | 'dailyTrend' | 'intentTable' | 'agentComparison' | 'failureReasons'
+export type WidgetId =
+  'fixFirst' | 'kpis' | 'dailyTrend' | 'intentTable' | 'agentComparison' | 'failureReasons'
 
 /** Column span on the 12-column grid: a third, a half, two thirds, full. */
 export type WidgetWidth = 4 | 6 | 8 | 12
@@ -46,6 +48,26 @@ export type WidgetDefinition = {
 }
 
 export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
+  fixFirst: {
+    id: 'fixFirst',
+    titleKey: 'widget.fixFirst.title',
+    descriptionKey: 'widget.fixFirst.description',
+    // Full width because each finding is a headline, its evidence and its
+    // impact on one line; in a third of the canvas they wrap into a paragraph.
+    defaultSize: { w: 12, h: 'M' },
+    minSize: { w: 6, h: 'S' },
+    glossary: [
+      'outlierAgent',
+      'decliningIntent',
+      'incidentDay',
+      'impact',
+      'transferRate',
+      'median',
+      'unresolved',
+      'toolError',
+    ],
+    component: FixFirstWidget,
+  },
   kpis: {
     id: 'kpis',
     titleKey: 'widget.kpis.title',
