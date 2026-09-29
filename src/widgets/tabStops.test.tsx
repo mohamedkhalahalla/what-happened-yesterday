@@ -65,21 +65,22 @@ describe('Intents table tab stops', () => {
     expect(count(/tabindex="0"/g)).toBe(0)
   })
 
-  it('has one row control per row plus a fixed set of header controls', () => {
+  it('has exactly one row control per row plus a fixed set of header controls', () => {
     /*
-     * Expected: 6 sortable column headers, 2 column ⓘ buttons, and per row
-     * the intent name and the unresolved count — the latter being a
-     * drill-down path, not a tooltip trigger, so it stays.
+     * Expected: 6 sortable column headers, 2 column ⓘ buttons, and exactly one
+     * control per row — the intent name. The unresolved count used to be a
+     * second button; that narrowing is a chip inside the drill panel now, so a
+     * reader tabs through 25 rows rather than 50 controls.
      */
     const headerControls = 6 + 2
-    const perRow = 2
+    const perRow = 1
 
     expect(count(/<button/g)).toBe(headerControls + rowCount * perRow)
   })
 
   it('stays under a third of the stops it had before', () => {
     // Was 106 (56 buttons + 50 delta spans) on the same data.
-    expect(count(/<button/g) + count(/tabindex="0"/g)).toBeLessThan(106 / 3 + 26)
+    expect(count(/<button/g) + count(/tabindex="0"/g)).toBeLessThan(106 / 3)
   })
 
   it('keeps an explanation in the DOM for every delta', () => {

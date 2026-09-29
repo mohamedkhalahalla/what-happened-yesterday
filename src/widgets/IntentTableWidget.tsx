@@ -208,24 +208,14 @@ export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetPr
                   )}
                 </td>
 
-                <td className="px-2 py-1 text-end tabular-nums">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openDrill({
-                        range: filters.range,
-                        // The calls the agent did not finish, for this intent.
-                        constraints: { intent: row.code, resolved: false },
-                        source: 'intentTable',
-                      })
-                    }
-                    aria-label={t('intents.showUnresolved', {
-                      intent: intentLabel(lang, row.code),
-                    })}
-                    className="rounded-md font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                  >
-                    {formatInt(lang, row.unresolved)}
-                  </button>
+                {/*
+                  Plain text, not a button. It was a second drill-down path per
+                  row, which cost a tab stop on all 25 rows to reach a view the
+                  intent name already opens — the drill panel has an
+                  "Unresolved" chip, so the narrowing lives there instead.
+                */}
+                <td className="px-2 py-1 text-end font-medium tabular-nums text-foreground">
+                  {formatInt(lang, row.unresolved)}
                 </td>
 
                 <td className="px-2 py-1 text-end tabular-nums">
