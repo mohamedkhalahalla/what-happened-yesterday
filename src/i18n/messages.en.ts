@@ -241,7 +241,7 @@ export const en = {
   'reasons.abandoned': 'Abandoned',
   'reasons.barAria':
     '{reason}: {current} per 100 calls, against {previous} in the comparison period',
-  'reasons.showCalls': 'Show calls for {reason}',
+  'reasons.showCallsIn': 'Show {reason} calls, {period}',
   'reasons.caption': 'Failure reasons per 100 calls',
   'reasons.summary': '{top} is the most common at {rate} per 100 calls. {notable}',
   'reasons.summaryNotable': '{reason} changed notably against the comparison period ({delta}).',

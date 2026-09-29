@@ -232,7 +232,7 @@ export const ar: Record<MessageKey, string> = {
   'reasons.per100': 'لكل 100 مكالمة',
   'reasons.abandoned': 'انقطاع المكالمة',
   'reasons.barAria': '{reason}: {current} لكل 100 مكالمة، مقابل {previous} في فترة المقارنة',
-  'reasons.showCalls': 'عرض مكالمات {reason}',
+  'reasons.showCallsIn': 'عرض مكالمات {reason}، {period}',
   'reasons.caption': 'أسباب الإخفاق لكل 100 مكالمة',
   'reasons.summary': '{top} هو الأكثر شيوعًا بمعدل {rate} لكل 100 مكالمة. {notable}',
   'reasons.summaryNotable': '{reason} تغيّر بشكل ملحوظ مقارنة بفترة المقارنة ({delta}).',

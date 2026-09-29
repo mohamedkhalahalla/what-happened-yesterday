@@ -98,6 +98,10 @@ export type StackedBarProps = {
   total?: number
   /** Overall description, e.g. "Outcome breakdown". */
   label: string
+  /** Makes each segment open the calls behind it. */
+  onSelect?: (key: string) => void
+  /** Accessible name for one segment's control. Required with `onSelect`. */
+  selectLabel?: (segment: StackedSegment) => string
 }
 
 /**
@@ -105,8 +109,17 @@ export type StackedBarProps = {
  *
  * The legend is not optional decoration: colour alone cannot carry which
  * segment is which, and the segments are often too small to label in place.
+ *
+ * ## Which part is the control
+ *
+ * With `onSelect`, the **legend entry** is the real control: it has the label,
+ * the number and a target big enough to hit, and it is the one that takes a
+ * tab stop. The coloured slice is a second way to reach the same action for
+ * anyone already pointing at it — deliberately not focusable and hidden from
+ * assistive tech, because an abandonment sliver two pixels wide is a fine
+ * click target and a terrible tab stop.
  */
-export function StackedBar({ segments, total, label }: StackedBarProps) {
+export function StackedBar({ segments, total, label, onSelect, selectLabel }: StackedBarProps) {
   const { lang } = useI18n()
   const sum = segments.reduce((acc, segment) => acc + segment.value, 0)
   const denominator = total ?? sum
@@ -126,31 +139,63 @@ export function StackedBar({ segments, total, label }: StackedBarProps) {
         role="img"
         aria-label={textEquivalent}
       >
-        {segments.map((segment) => (
-          <div
-            key={segment.key}
-            className={`h-full transition-[inline-size] duration-300 ease-out ${TONE_FILL[segment.tone]}`}
-            style={{ inlineSize: `${ratio(segment.value, denominator) * 100}%` }}
-          />
-        ))}
+        {segments.map((segment) => {
+          const style = { inlineSize: `${ratio(segment.value, denominator) * 100}%` }
+          const className = `h-full transition-[inline-size] duration-300 ease-out ${TONE_FILL[segment.tone]}`
+
+          return onSelect === undefined ? (
+            <div key={segment.key} className={className} style={style} />
+          ) : (
+            <button
+              key={segment.key}
+              type="button"
+              // The legend entry below is the labelled, focusable control for
+              // this same segment; this is the pointer shortcut to it.
+              tabIndex={-1}
+              aria-hidden
+              onClick={() => onSelect(segment.key)}
+              className={`${className} cursor-pointer`}
+              style={style}
+            />
+          )
+        })}
       </div>
 
       <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-        {segments.map((segment) => (
-          <li key={segment.key} className="inline-flex items-center gap-1.5 text-[12.5px]">
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${TONE_FILL[segment.tone]}`}
-              aria-hidden
-            />
-            <span className="text-muted-foreground">{segment.label}</span>
-            <bdi className="font-medium text-card-foreground" data-numeric>
-              {formatInt(lang, segment.value)}
-            </bdi>
-            <bdi className="text-muted-foreground" data-numeric>
-              ({formatPercent(lang, ratio(segment.value, denominator))})
-            </bdi>
-          </li>
-        ))}
+        {segments.map((segment) => {
+          const entry = (
+            <>
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${TONE_FILL[segment.tone]}`}
+                aria-hidden
+              />
+              <span className="text-muted-foreground">{segment.label}</span>
+              <bdi className="font-medium text-card-foreground" data-numeric>
+                {formatInt(lang, segment.value)}
+              </bdi>
+              <bdi className="text-muted-foreground" data-numeric>
+                ({formatPercent(lang, ratio(segment.value, denominator))})
+              </bdi>
+            </>
+          )
+
+          return (
+            <li key={segment.key} className="text-[12.5px]">
+              {onSelect === undefined ? (
+                <span className="inline-flex items-center gap-1.5">{entry}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelect(segment.key)}
+                  aria-label={selectLabel?.(segment)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  {entry}
+                </button>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

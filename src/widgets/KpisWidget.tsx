@@ -155,6 +155,11 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
     },
   ]
 
+  /*
+   * The segment keys are drill outcomes, not display strings: the bar and the
+   * drill-down agree by construction rather than by a lookup table that could
+   * fall out of step with either.
+   */
   const segments: StackedSegment[] = [
     { key: 'resolved', label: outcomeLabel(lang, 0), value: current.resolved, tone: 'good' },
     {
@@ -203,7 +208,12 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
       {current.calls === 0 ? (
         <p className="text-[12.5px] text-muted-foreground">{t('state.empty')}</p>
       ) : (
-        <StackedBar segments={segments} label={t('outcome.breakdown')} />
+        <StackedBar
+          segments={segments}
+          label={t('outcome.breakdown')}
+          onSelect={(key) => drillTo(key as DrillOutcome)}
+          selectLabel={(segment) => t('kpi.showCalls', { label: segment.label })}
+        />
       )}
     </div>
   )

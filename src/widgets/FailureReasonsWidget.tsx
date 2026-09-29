@@ -20,7 +20,9 @@ import { DeltaValue } from '../components/DeltaValue'
 import { handoffLabel } from '../i18n/dictionary'
 import { useI18n } from '../i18n/useI18n'
 import { formatDecimal, formatPointsDelta } from '../lib/format'
+import { comparisonRange } from '../state/presets'
 import { useDrill } from '../state/drill'
+import type { DrillConstraints } from '../state/drill'
 import { buildReasonRows, type ReasonRow } from './reasonsData'
 import type { WidgetProps } from './types'
 
@@ -70,10 +72,19 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
     })
   }
 
-  const drillTo = (row: ReasonRow): void => {
+  /*
+   * Each bar opens *its own* period. The comparison bar is the only place in
+   * the dashboard where a reader is looking at a number from a range they did
+   * not select, and sending them to this period's calls would quietly answer
+   * a different question from the one they clicked on.
+   */
+  const drillTo = (row: ReasonRow, period: 'current' | 'previous'): void => {
+    const constraints: DrillConstraints =
+      row.kind === 'abandoned' ? { outcome: 'abandoned' } : { handoff: row.code }
+
     openDrill({
-      range: filters.range,
-      constraints: row.kind === 'abandoned' ? { outcome: 'abandoned' } : { handoff: row.code },
+      range: period === 'current' ? filters.range : comparisonRange(filters.range),
+      constraints,
       source: 'failureReasons',
     })
   }
@@ -120,20 +131,34 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
    * headers pinned. The label travelling with the bar removes the dependency
    * entirely.
    */
-  const bar = (label: string, value: number, tone: string) => (
-    <div className="flex items-center gap-2">
-      <span className="w-28 shrink-0 truncate text-[10px] text-muted-foreground">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full ${tone}`}
-          style={{ inlineSize: `${Math.min(100, (value / scaleMax) * 100)}%` }}
-        />
-      </div>
-      <span className="w-8 shrink-0 text-end text-[10px] tabular-nums text-muted-foreground">
-        {formatDecimal(lang, value)}
-      </span>
-    </div>
-  )
+  const bar = (row: ReasonRow, period: 'current' | 'previous') => {
+    const periodLabel = t(period === 'current' ? 'reasons.col.current' : 'reasons.col.previous')
+    const value = period === 'current' ? row.currentPer100 : row.previousPer100
+
+    return (
+      <button
+        type="button"
+        onClick={() => drillTo(row, period)}
+        aria-label={t('reasons.showCallsIn', { reason: label(row), period: periodLabel })}
+        className="flex w-full items-center gap-2 rounded-md px-1 py-0.5 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <span className="w-28 shrink-0 truncate text-[10px] text-muted-foreground">
+          {periodLabel}
+        </span>
+        <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+          <span
+            className={`block h-full rounded-full ${
+              period === 'current' ? 'bg-data-6' : 'bg-data-2'
+            }`}
+            style={{ inlineSize: `${Math.min(100, (value / scaleMax) * 100)}%` }}
+          />
+        </span>
+        <span className="w-8 shrink-0 text-end text-[10px] tabular-nums text-muted-foreground">
+          {formatDecimal(lang, value)}
+        </span>
+      </button>
+    )
+  }
 
   return (
     <ChartFrame<ReasonRow>
@@ -151,12 +176,13 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
       <ul className="space-y-2.5">
         {rows.map((row) => (
           <li key={row.key}>
-            <button
-              type="button"
-              onClick={() => drillTo(row)}
-              aria-label={t('reasons.showCalls', { reason: label(row) })}
-              className="w-full rounded-md px-1 py-0.5 text-start hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
+            {/*
+              Not one button around the whole row any more: the two bars go to
+              different periods, and a control cannot have two destinations.
+              The heading line is therefore text, and each bar is its own
+              control — which is also what the bar's own label now promises.
+            */}
+            <div className="px-1 py-0.5">
               <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
                 <span className="truncate text-foreground">{label(row)}</span>
                 <span className="flex shrink-0 items-baseline gap-2">
@@ -181,8 +207,8 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
               </div>
 
               <div className="mt-1 space-y-1">
-                {bar(t('reasons.col.current'), row.currentPer100, 'bg-data-6')}
-                {showDelta && bar(t('reasons.col.previous'), row.previousPer100, 'bg-data-2')}
+                {bar(row, 'current')}
+                {showDelta && bar(row, 'previous')}
               </div>
 
               <span className="sr-only-text">
@@ -192,7 +218,7 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
                   previous: formatDecimal(lang, row.previousPer100),
                 })}
               </span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>
