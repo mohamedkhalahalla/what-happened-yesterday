@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:detectors": "vitest run --mode sweep src/insights/falseAlarm.test.ts",
     "test:tz": "cross-env TZ=UTC vitest run && cross-env TZ=America/Los_Angeles vitest run && cross-env TZ=Pacific/Kiritimati vitest run",
     "bench": "tsx scripts/bench.ts",
     "lint:css": "tsx scripts/check-logical-css.ts"
