@@ -139,7 +139,16 @@ export function ChartFrame<Row>({
             onKeyDown={onKeyDown}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="min-h-0 flex-1 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            /*
+              overflow-auto matters as much as the styling here. Without it
+              the chart view establishes no scroll container, so a tall chart
+              overflows the whole <figure> into the widget body and the title,
+              the view toggle and the legend all scroll away with it — while
+              the table view, which does scroll internally, keeps them pinned.
+              The two views have to behave the same way or switching between
+              them moves the furniture.
+            */
+            className="min-h-0 flex-1 overflow-auto rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {children}
           </div>
