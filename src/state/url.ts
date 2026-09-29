@@ -51,6 +51,8 @@ export type Correction =
    * sent did not fully survive.
    */
   | { kind: 'invalidDrill' }
+  /** Same again for the demo seed: raised by `parseSeed`, shown once, here. */
+  | { kind: 'invalidSeed'; value: string }
 
 export type UrlListParam = 'agents' | 'intents' | 'language'
 
@@ -249,6 +251,31 @@ export function serialize(state: FilterState, bounds: DataBounds): string {
   }
 
   const query = ordered.toString()
+  return query === '' ? '' : `?${query}`
+}
+
+/**
+ * Apply a serialized filter state to an existing query string.
+ *
+ * `serialize` builds the filter parameters from nothing, which is what makes
+ * two people's links byte-identical — but the query string also carries
+ * parameters this module does not own: the drill-down, and which synthetic
+ * quarter is being shown. Rebuilding from scratch would silently drop them,
+ * so changing one filter would close an open drill or throw the reader back
+ * to the default data.
+ *
+ * Filters keep their fixed order and foreign parameters follow in the order
+ * they arrived, so the result is still deterministic.
+ */
+export function withFilterParams(search: string, filterQuery: string): string {
+  const owned = new Set(PARAM_ORDER)
+  const merged = new URLSearchParams(filterQuery)
+
+  for (const [key, value] of new URLSearchParams(search)) {
+    if (!owned.has(key)) merged.set(key, value)
+  }
+
+  const query = merged.toString()
   return query === '' ? '' : `?${query}`
 }
 

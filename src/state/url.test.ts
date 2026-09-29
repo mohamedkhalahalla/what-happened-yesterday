@@ -9,6 +9,7 @@ import {
   isDefaultState,
   parse,
   serialize,
+  withFilterParams,
   type Correction,
   type FilterState,
 } from './url'
@@ -300,5 +301,44 @@ describe('the shareable link in the brief', () => {
     // spelled out — but they are still explicit the moment anything moves.
     expect(serialize(state, bounds)).toBe('?agents=agent_06&intents=roaming&language=ar')
     expect(parse(serialize(state, bounds), bounds).state).toEqual(state)
+  })
+})
+
+describe('withFilterParams', () => {
+  /*
+   * `serialize` deliberately builds the filter parameters from nothing, so
+   * two people who built the same filters by different routes get the same
+   * link. The query string also carries parameters this module does not own —
+   * the drill-down, and which synthetic quarter is on screen — and rebuilding
+   * from scratch used to drop them, so changing one filter closed an open
+   * drill and threw the reader back to the default data.
+   */
+  it('keeps parameters the filters do not own', () => {
+    const merged = withFilterParams('?seed=42&drill=all&from=2020-01-01', '?from=2026-09-20')
+
+    expect(merged).toContain('seed=42')
+    expect(merged).toContain('drill=all')
+    // The filter value wins: it is the one being set.
+    expect(merged).toContain('from=2026-09-20')
+    expect(merged).not.toContain('2020-01-01')
+  })
+
+  it('drops a filter the new state no longer sets', () => {
+    // Clearing the agents filter must actually clear it, not inherit the old
+    // value back out of the existing URL.
+    const merged = withFilterParams('?agents=agent_06&seed=42', '')
+
+    expect(merged).not.toContain('agents')
+    expect(merged).toContain('seed=42')
+  })
+
+  it('puts the filters first and keeps foreign parameters in order', () => {
+    expect(withFilterParams('?seed=42&drill=all', '?from=2026-09-20&to=2026-09-26')).toBe(
+      '?from=2026-09-20&to=2026-09-26&seed=42&drill=all',
+    )
+  })
+
+  it('returns an empty string rather than a bare question mark', () => {
+    expect(withFilterParams('', '')).toBe('')
   })
 })

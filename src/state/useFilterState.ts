@@ -14,7 +14,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
-import { parse, serialize, type Correction, type FilterState } from './url'
+import { parse, serialize, withFilterParams, type Correction, type FilterState } from './url'
 import type { DataBounds } from './presets'
 
 const listeners = new Set<() => void>()
@@ -98,16 +98,23 @@ export function useFilterState(bounds: DataBounds): FilterStateHandle {
 
   const parsed = useMemo(() => parse(search, bounds), [search, bounds])
 
+  /*
+   * Through `withFilterParams`, so a filter change keeps the parts of the URL
+   * the filters do not own — the drill-down and the demo seed. Serializing
+   * straight over the query string would quietly discard both.
+   */
   const setState = useCallback(
     (next: FilterState) => {
-      replaceSearch(serialize(next, bounds))
+      replaceSearch(withFilterParams(window.location.search, serialize(next, bounds)))
     },
     [bounds],
   )
 
   const update = useCallback(
     (patch: Partial<FilterState>) => {
-      replaceSearch(serialize({ ...parsed.state, ...patch }, bounds))
+      replaceSearch(
+        withFilterParams(window.location.search, serialize({ ...parsed.state, ...patch }, bounds)),
+      )
     },
     [parsed.state, bounds],
   )

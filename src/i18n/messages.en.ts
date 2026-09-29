@@ -357,6 +357,15 @@ export const en = {
   'glossary.impact.def':
     'Calls that failed beyond what the thing being measured would normally produce. An estimate, rounded to two figures.',
 
+  'seed.label': 'Synthetic data',
+  'seed.value': 'seed {seed}',
+  'seed.shuffle': 'Shuffle',
+  'seed.shuffleHint': 'Show a different synthetic quarter, with the anomalies somewhere else',
+  'seed.reset': 'Reset to default',
+  'seed.resetHint': 'Back to the quarter this demo ships with',
+  'seed.generating': 'Generating data...',
+  'seed.error': 'That quarter could not be generated. Reset to the default seed to continue.',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

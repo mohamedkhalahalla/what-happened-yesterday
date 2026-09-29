@@ -58,6 +58,14 @@ export function useAggregates(
   client: EngineClient | null,
   state: FilterState,
   bounds: DataBounds,
+  /**
+   * Changes when the worker's dataset is replaced — i.e. the demo seed.
+   *
+   * The same query over different data is a different answer, and nothing in
+   * the query says so. Without this the dashboard would keep showing the old
+   * quarter's aggregates under the new quarter's URL.
+   */
+  dataVersion = 0,
 ): AggregatesHandle {
   const [data, setData] = useState<Aggregates | null>(null)
   const [isFetching, setIsFetching] = useState(false)
@@ -109,7 +117,7 @@ export function useAggregates(
       cancelled = true
       clearTimeout(indicator)
     }
-  }, [client, query])
+  }, [client, query, dataVersion])
 
   return { data, isFetching, ...timings, error }
 }
