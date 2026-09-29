@@ -207,6 +207,45 @@ describe('determinism', () => {
   })
 })
 
+describe('without anomalies', () => {
+  /*
+   * The same quarter with nothing wrong in it. These tests only check that it
+   * is a *well-formed* dataset — that switching the stories off did not
+   * quietly change the size or the determinism of the thing. Whether it is
+   * actually free of findings is a question for the detectors, and it is
+   * asked in `src/insights/detect.test.ts` as the precision case.
+   */
+  it('still generates exactly the stated number of rows', () => {
+    const plain = generateDataset(SEED, { anomalies: false })
+
+    expect(plain.n).toBe(TOTAL_CALLS)
+    expect(plain.days).toBe(DAYS)
+    expect(plain.firstDay).toBe(ds.firstDay)
+    // Row zero of the day after the last is the end of the data, by definition.
+    expect(plain.dayStartRow[DAYS]).toBe(TOTAL_CALLS)
+  })
+
+  it('is deterministic: same seed and options, identical columns', () => {
+    const once = generateDataset(SEED, { anomalies: false })
+    const twice = generateDataset(SEED, { anomalies: false })
+
+    expect(hashDataset(twice)).toBe(hashDataset(once))
+  })
+
+  it('is a different dataset from the one with the stories in it', () => {
+    // Otherwise the switch does nothing and every precision test below is
+    // measuring the anomalous dataset twice.
+    expect(hashDataset(generateDataset(SEED, { anomalies: false }))).not.toBe(hashDataset(ds))
+  })
+
+  it('still follows its seed, not the options object', () => {
+    const a = generateDataset(SEED + 1, { anomalies: false })
+    const b = generateDataset(SEED + 2, { anomalies: false })
+
+    expect(hashDataset(a)).not.toBe(hashDataset(b))
+  })
+})
+
 // --- rhythm ----------------------------------------------------------------
 
 describe('weekly and seasonal rhythm', () => {

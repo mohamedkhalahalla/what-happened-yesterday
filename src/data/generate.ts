@@ -10,6 +10,19 @@
  * anomalies are *planted* here, and every other part of the app has to
  * discover them from the data the way the director would.
  *
+ * ## The `anomalies` switch
+ *
+ * `generateDataset(seed, { anomalies: false })` builds the same quarter with
+ * the three planted stories removed and nothing else changed: no deploy day,
+ * roaming following the ordinary rules like every other intent, and Majed
+ * behaving like his colleagues.
+ *
+ * It exists to measure **precision**. Recall is easy to test — plant three
+ * things, check the detectors find them — but a detector that flags everything
+ * also scores perfect recall. The honest question is how often it cries wolf,
+ * and the only way to ask it is to run the detectors over data with nothing
+ * in it and require silence.
+ *
  * Note on the `!` assertions below: indices into `INTENTS` / the mix arrays
  * always come from `pickWeighted` over those same arrays, so they are in range
  * by construction. The assertions only silence `noUncheckedIndexedAccess`.
@@ -88,8 +101,10 @@ type DayContext = {
   resolveTrend: number
   /** Where roaming's decaying resolve rate has got to on this day. */
   roamingResolve: number
-  /** True on the day the bad deploy shipped. */
+  /** True on the day the bad deploy shipped. Always false without anomalies. */
   isDeployDay: boolean
+  /** Whether roaming follows its decaying ramp rather than its ordinary rate. */
+  roamingDegrades: boolean
   hourly: readonly number[]
   hourlyTotal: number
 }
@@ -189,7 +204,8 @@ function resolveOdds(
   toolErrors: number,
   ctx: DayContext,
 ): { p: number; pWithoutDecline: number } {
-  const isRoaming = intentCode === ROAMING
+  // Without the planted decline, roaming is just another intent.
+  const isRoaming = intentCode === ROAMING && ctx.roamingDegrades
   // Roaming follows its own ramp and deliberately ignores the rising trend.
   const base = isRoaming ? ctx.roamingResolve : INTENTS[intentCode]!.baseResolve + ctx.resolveTrend
   const languageAdjust = LANGUAGE_RESOLVE_ADJUST[languageCode]!
@@ -250,6 +266,7 @@ function buildDayContext(
   deployDay: number,
   ramadanFrom: number,
   ramadanTo: number,
+  anomalies: boolean,
 ): DayContext {
   const dayIndex = firstDay + offset
   const progress = offset / (DAYS - 1)
@@ -264,7 +281,8 @@ function buildDayContext(
       STORY.degradingIntent.endResolve,
       progress,
     ),
-    isDeployDay: dayIndex === deployDay,
+    isDeployDay: anomalies && dayIndex === deployDay,
+    roamingDegrades: anomalies,
     hourly: inRamadan ? RAMADAN_HOURLY : NORMAL_HOURLY,
     hourlyTotal: inRamadan ? RAMADAN_HOURLY_TOTAL : NORMAL_HOURLY_TOTAL,
   }
@@ -282,13 +300,21 @@ function decideOutcome(
   intentCode: number,
   toolErrors: number,
   odds: { p: number; pWithoutDecline: number },
+  anomalies: boolean,
 ): { outcome: number; handoff: number } {
   const u = rng()
 
   if (u < odds.p) {
     // Majed hands off calls the other agents would have finished themselves.
-    if (agentCode === MAJED && rng() < STORY.overTransferringAgent.overrideProbability) {
-      return { outcome: TRANSFERRED, handoff: LOW_CONFIDENCE }
+    if (agentCode === MAJED) {
+      /*
+       * The draw happens either way, so switching the anomaly off changes
+       * what Majed does with a call and not which random numbers the rest of
+       * the run sees. Short-circuiting here would shift the whole stream and
+       * make the two datasets incomparable for reasons unrelated to Majed.
+       */
+      const handsOff = rng() < STORY.overTransferringAgent.overrideProbability
+      if (anomalies && handsOff) return { outcome: TRANSFERRED, handoff: LOW_CONFIDENCE }
     }
     return { outcome: RESOLVED, handoff: NO_HANDOFF }
   }
@@ -310,7 +336,14 @@ function decideOutcome(
  * Fill one row. The order of `rng()` draws here is part of the dataset's
  * identity — reordering them changes every downstream value for a given seed.
  */
-function fillRow(ds: Dataset, row: number, epochSec: number, ctx: DayContext, rng: Rng): void {
+function fillRow(
+  ds: Dataset,
+  row: number,
+  epochSec: number,
+  ctx: DayContext,
+  rng: Rng,
+  anomalies: boolean,
+): void {
   const hour = riyadhHour(epochSec)
   const languageCode = pickWeighted(rng, LANGUAGE_MIX, LANGUAGE_MIX_TOTAL)
   const agentCode = Math.floor(rng() * AGENTS.length)
@@ -321,7 +354,14 @@ function fillRow(ds: Dataset, row: number, epochSec: number, ctx: DayContext, rn
   const toolErrors = drawToolErrors(rng, intentCode, inDeployWindow)
 
   const odds = resolveOdds(intentCode, languageCode, toolErrors, ctx)
-  const { outcome, handoff } = decideOutcome(rng, agentCode, intentCode, toolErrors, odds)
+  const { outcome, handoff } = decideOutcome(
+    rng,
+    agentCode,
+    intentCode,
+    toolErrors,
+    odds,
+    anomalies,
+  )
 
   const sentimentStart = clamp(normal(rng, SENTIMENT_START_MEAN, SENTIMENT_START_SD), -1, 1)
   const sentimentEnd =
@@ -341,11 +381,23 @@ function fillRow(ds: Dataset, row: number, epochSec: number, ctx: DayContext, rn
   ds.toolErrors[row] = toolErrors
 }
 
+export type GenerateOptions = {
+  /**
+   * Plant the three stories from {@link STORY}. False produces the same
+   * quarter with nothing wrong in it — see the note at the top of this file
+   * for why that dataset exists.
+   */
+  anomalies?: boolean
+}
+
 /**
  * Generate the full 90-day, {@link TOTAL_CALLS}-row dataset.
- * Same seed in, identical columns out.
+ * Same seed and options in, identical columns out.
  */
-export function generateDataset(seed: number = SEED): Dataset {
+export function generateDataset(
+  seed: number = SEED,
+  { anomalies = true }: GenerateOptions = {},
+): Dataset {
   const rng = mulberry32(seed)
   // Data ends the day before "today", so the window starts DAYS days before it.
   const firstDay = isoToDayIndex(ANCHOR_TODAY_ISO) - DAYS
@@ -360,10 +412,10 @@ export function generateDataset(seed: number = SEED): Dataset {
   let row = 0
   for (let offset = 0; offset < DAYS; offset++) {
     ds.dayStartRow[offset] = row
-    const ctx = buildDayContext(offset, firstDay, deployDay, ramadanFrom, ramadanTo)
+    const ctx = buildDayContext(offset, firstDay, deployDay, ramadanFrom, ramadanTo, anomalies)
 
     for (const epochSec of drawDayTimestamps(rng, ctx, callsPerDay[offset]!)) {
-      fillRow(ds, row, epochSec, ctx, rng)
+      fillRow(ds, row, epochSec, ctx, rng, anomalies)
       row++
     }
   }
