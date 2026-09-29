@@ -28,6 +28,7 @@ export type GlossaryTermId =
   | 'median'
   | 'unresolved'
   | 'notable'
+  | 'whyFlagged'
 
 export type GlossaryTerm = {
   id: GlossaryTermId
@@ -105,6 +106,11 @@ export const GLOSSARY: Record<GlossaryTermId, GlossaryTerm> = {
     id: 'notable',
     termKey: 'glossary.notable',
     definitionKey: 'glossary.notable.def',
+  },
+  whyFlagged: {
+    id: 'whyFlagged',
+    termKey: 'glossary.whyFlagged',
+    definitionKey: 'glossary.whyFlagged.def',
   },
 }
 

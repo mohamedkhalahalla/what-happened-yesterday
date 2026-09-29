@@ -16,6 +16,7 @@
 import { useMemo, useState } from 'react'
 
 import { ChartFrame, type ChartTableColumn, type LegendItem } from '../charts/ChartFrame'
+import { DeltaValue } from '../components/DeltaValue'
 import { handoffLabel } from '../i18n/dictionary'
 import { useI18n } from '../i18n/useI18n'
 import { formatDecimal, formatPointsDelta } from '../lib/format'
@@ -100,16 +101,37 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
       key: 'delta',
       header: t('reasons.col.delta'),
       numeric: true,
-      cell: (row) => (showDelta ? formatPointsDelta(lang, row.delta.delta) : '—'),
+      cell: (row) =>
+        showDelta ? (
+          <DeltaValue comparison={row.delta}>{formatPointsDelta(lang, row.delta.delta)}</DeltaValue>
+        ) : (
+          '—'
+        ),
     },
   ]
 
-  const bar = (value: number, tone: string) => (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className={`h-full rounded-full ${tone}`}
-        style={{ inlineSize: `${Math.min(100, (value / scaleMax) * 100)}%` }}
-      />
+  /**
+   * One labelled bar.
+   *
+   * The period label sits on the bar rather than only in the legend. The
+   * legend lives at the foot of the figure and scrolls out of the widget body,
+   * so a reader who had scrolled down was left matching two shades against a
+   * key they could no longer see — while the table view kept its column
+   * headers pinned. The label travelling with the bar removes the dependency
+   * entirely.
+   */
+  const bar = (label: string, value: number, tone: string) => (
+    <div className="flex items-center gap-2">
+      <span className="w-28 shrink-0 truncate text-[10px] text-muted-foreground">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ inlineSize: `${Math.min(100, (value / scaleMax) * 100)}%` }}
+        />
+      </div>
+      <span className="w-8 shrink-0 text-end text-[10px] tabular-nums text-muted-foreground">
+        {formatDecimal(lang, value)}
+      </span>
     </div>
   )
 
@@ -138,26 +160,29 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
               <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
                 <span className="truncate text-foreground">{label(row)}</span>
                 <span className="flex shrink-0 items-baseline gap-2">
-                  <span className="tabular-nums text-foreground">
-                    {formatDecimal(lang, row.currentPer100)}
-                  </span>
                   {showDelta && (
-                    <span
-                      className={`tabular-nums ${
-                        row.delta.verdict === 'notable'
-                          ? 'text-foreground'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {formatPointsDelta(lang, row.delta.delta)}
+                    <span className="tabular-nums">
+                      <DeltaValue comparison={row.delta} insideFocusable>
+                        {formatPointsDelta(lang, row.delta.delta)}
+                        {/*
+                          A badge only when a reason got notably *worse*. A
+                          failure reason falling is good news and needs no
+                          call to action, so it gets the number alone.
+                        */}
+                        {row.delta.verdict === 'notable' && row.delta.delta > 0 && (
+                          <span className="ms-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                            {t('reasons.worse')}
+                          </span>
+                        )}
+                      </DeltaValue>
                     </span>
                   )}
                 </span>
               </div>
 
               <div className="mt-1 space-y-1">
-                {bar(row.currentPer100, 'bg-data-6')}
-                {showDelta && bar(row.previousPer100, 'bg-data-2')}
+                {bar(t('reasons.col.current'), row.currentPer100, 'bg-data-6')}
+                {showDelta && bar(t('reasons.col.previous'), row.previousPer100, 'bg-data-2')}
               </div>
 
               <span className="sr-only-text">

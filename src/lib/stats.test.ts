@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { compareCounts, compareRates } from './stats'
+import { COUNT_MIN_RATIO, KPI_MIN_POINTS, SEGMENT_MIN_POINTS } from './thresholds'
 
 describe('compareRates', () => {
   it('calls last week vs the week before "normal"', () => {
@@ -12,6 +13,67 @@ describe('compareRates', () => {
     expect(result.verdict).toBe('normal')
     expect(Math.abs(result.z)).toBeLessThan(2)
     expect(result.delta).toBeCloseTo(-0.0006, 4)
+  })
+
+  it('needs the change to be material, not merely significant', () => {
+    // 20,000 calls a side resolve a 1.25-point shift to z = 2.5. That
+    // is real and it is not worth anyone's morning, so the segment threshold
+    // reports it as normal while recording why.
+    const small = compareRates(10250, 20000, 10000, 20000)
+
+    expect(Math.abs(small.z)).toBeGreaterThan(2)
+    expect(Math.abs(small.delta) * 100).toBeLessThan(SEGMENT_MIN_POINTS)
+    expect(small.verdict).toBe('normal')
+    expect(small.significantButSmall).toBe(true)
+  })
+
+  it('needs the change to be significant, not merely large', () => {
+    // A 10-point gap on 40 calls a side looks dramatic and proves nothing.
+    const noisy = compareRates(24, 40, 20, 40)
+
+    expect(Math.abs(noisy.delta) * 100).toBeGreaterThan(SEGMENT_MIN_POINTS)
+    expect(Math.abs(noisy.z)).toBeLessThan(2)
+    expect(noisy.verdict).toBe('normal')
+    expect(noisy.significantButSmall).toBe(false)
+  })
+
+  it('applies a lower bar to whole-centre KPIs than to one segment', () => {
+    // The same 1.5-point move (z = 3.0): material for the centre, not for
+    // one intent.
+    const args = [10300, 20000, 10000, 20000] as const
+    expect(compareRates(...args, KPI_MIN_POINTS).verdict).toBe('notable')
+    expect(compareRates(...args, SEGMENT_MIN_POINTS).verdict).toBe('normal')
+  })
+
+  it('reports the normal range as 2 x SE, hand-computed', () => {
+    /*
+     * Worked by hand so the number in the tooltip is checkable:
+     *   k1=600 n1=1000, k2=550 n2=1000
+     *   pooled = 1150 / 2000                     = 0.575
+     *   se = sqrt(0.575 * 0.425 * (1/1000 + 1/1000))
+     *      = sqrt(0.244375 * 0.002)
+     *      = sqrt(0.00048875)                    = 0.02210770...
+     *   normalRange = 2 * se                     = 0.04421540...  (4.42 pts)
+     */
+    const result = compareRates(600, 1000, 550, 1000)
+
+    const pooled = 1150 / 2000
+    const se = Math.sqrt(pooled * (1 - pooled) * (1 / 1000 + 1 / 1000))
+
+    expect(result.se).toBeCloseTo(se, 12)
+    expect(result.se).toBeCloseTo(0.0221077, 7)
+    expect(result.normalRange).toBeCloseTo(2 * se, 12)
+    expect(result.normalRange).toBeCloseTo(0.0442154, 7)
+    // In points, which is how the tooltip phrases it.
+    expect(result.normalRange * 100).toBeCloseTo(4.42, 2)
+
+    // 5 points clears both the 4.42-point noise band and the 3-point floor.
+    expect(result.verdict).toBe('notable')
+  })
+
+  it('reports a normal range of zero when it refuses to judge', () => {
+    expect(compareRates(5, 10, 5, 10).normalRange).toBe(0)
+    expect(compareCounts(2, 3).normalRange).toBe(0)
   })
 
   it('calls a real shift "notable"', () => {
@@ -75,6 +137,8 @@ describe('compareRates', () => {
       expect(Number.isFinite(result.delta), label).toBe(true)
       expect(Number.isFinite(result.se), label).toBe(true)
       expect(Number.isFinite(result.z), label).toBe(true)
+      expect(Number.isFinite(result.normalRange), label).toBe(true)
+      expect(result.normalRange, label).toBeGreaterThanOrEqual(0)
       expect(['notable', 'normal', 'insufficient']).toContain(result.verdict)
     }
   })
@@ -94,6 +158,16 @@ describe('compareCounts', () => {
     const result = compareCounts(15631, 15541)
     expect(result.verdict).toBe('normal')
     expect(result.delta).toBe(90)
+  })
+
+  it('needs a volume change to be relatively large, not just significant', () => {
+    // 2.5% more calls on 20,000 a side is significant (z = 2.5) and
+    // operationally nothing.
+    const small = compareCounts(20500, 20000)
+    expect(Math.abs(small.z)).toBeGreaterThan(2)
+    expect(small.delta / 20000).toBeLessThan(COUNT_MIN_RATIO)
+    expect(small.verdict).toBe('normal')
+    expect(small.significantButSmall).toBe(true)
   })
 
   it('calls a large volume swing "notable"', () => {

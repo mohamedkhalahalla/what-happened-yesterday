@@ -31,7 +31,15 @@ export type QuarterTrend = {
   comparison: Comparison
   /** True when the decline is both downward and bigger than noise. */
   declining: boolean
-  /** True when the rise is both upward and bigger than noise. */
+  /**
+   * True when the rise is both upward and material.
+   *
+   * Deliberately **not** badged in the UI. Badging improvements is what put
+   * twelve badges on screen at once and buried the single row that needed
+   * action; an improving intent needs no call to action, so it gets its arrow
+   * and its number and nothing more. Kept because it is a real fact about the
+   * row that a future summary line may want.
+   */
   improving: boolean
 }
 

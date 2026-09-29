@@ -86,6 +86,7 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
       'transferred',
       'points',
       'notable',
+      'whyFlagged',
       'previousPeriod',
     ],
     component: IntentTableWidget,
@@ -96,7 +97,7 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     descriptionKey: 'widget.agentComparison.description',
     defaultSize: { w: 6, h: 'M' },
     minSize: { w: 4, h: 'S' },
-    glossary: ['transferRate', 'transferred', 'median', 'notable', 'previousPeriod'],
+    glossary: ['transferRate', 'transferred', 'median', 'notable', 'whyFlagged', 'previousPeriod'],
     component: AgentComparisonWidget,
   },
   failureReasons: {
@@ -105,7 +106,15 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     descriptionKey: 'widget.failureReasons.description',
     defaultSize: { w: 6, h: 'M' },
     minSize: { w: 4, h: 'S' },
-    glossary: ['per100', 'handoffReason', 'toolError', 'abandoned', 'notable', 'previousPeriod'],
+    glossary: [
+      'per100',
+      'handoffReason',
+      'toolError',
+      'abandoned',
+      'notable',
+      'whyFlagged',
+      'previousPeriod',
+    ],
     component: FailureReasonsWidget,
   },
 }

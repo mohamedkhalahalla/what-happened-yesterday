@@ -9,6 +9,6 @@ export default defineConfig({
   test: {
     // Library/logic tests are pure TS and need no DOM.
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 })

@@ -262,6 +262,16 @@ export const en = {
   'glossary.notable.def':
     'Larger than sampling noise alone would explain, using a z-test against the comparison period. Not a claim about the cause.',
 
+  'delta.tooltip':
+    'Normal variation here: ±{range} pts. Changes are flagged when they exceed this and are at least {threshold} pts.',
+  'delta.tooltipInsufficient': 'Too few calls here to tell a real change from random variation.',
+  'delta.withinNormal': 'within normal variation',
+  'glossary.whyFlagged': 'Why this row and not that one',
+  'glossary.whyFlagged.def':
+    "The same-sized change can be flagged on one row and not another: rows with more calls, and rates further from 50%, vary less on their own, so a smaller move stands out. A change is flagged only when it is both larger than that row's normal variation and large enough to act on.",
+
+  'reasons.worse': 'Worse',
+
   'perf.readout': 'Computed in {worker} ms (worker) · {roundTrip} ms round-trip',
 } as const
 

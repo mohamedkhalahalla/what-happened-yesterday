@@ -15,6 +15,7 @@
 import { useMemo, useState } from 'react'
 
 import { ChartFrame, type ChartTableColumn, type LegendItem } from '../charts/ChartFrame'
+import { DeltaValue } from '../components/DeltaValue'
 import { agentName } from '../i18n/dictionary'
 import { useI18n } from '../i18n/useI18n'
 import { formatDecimal, formatInt, formatPercent, formatPointsDelta } from '../lib/format'
@@ -104,7 +105,12 @@ export function AgentComparisonWidget({ data, filters, showDelta }: WidgetProps)
       key: 'delta',
       header: t('agents.col.delta'),
       numeric: true,
-      cell: (row) => (showDelta ? formatPointsDelta(lang, row.delta.delta) : '—'),
+      cell: (row) =>
+        showDelta ? (
+          <DeltaValue comparison={row.delta}>{formatPointsDelta(lang, row.delta.delta)}</DeltaValue>
+        ) : (
+          '—'
+        ),
     },
   ]
 

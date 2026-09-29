@@ -13,6 +13,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { INTENTS, AGENTS } from '../data/dictionaries'
+import { compareRates } from '../lib/stats'
+import { KPI_MIN_POINTS, SEGMENT_MIN_POINTS } from '../lib/thresholds'
 import { generateDataset } from '../data/generate'
 import { aggregate } from '../engine/aggregate'
 import type { Dataset } from '../data/types'
@@ -67,6 +69,57 @@ describe('anomaly 2: the degrading intent', () => {
     const roaming = rows.find((row) => INTENTS[row.code]!.id === 'roaming')!
     expect(roaming.quarterTrend!.delta).toBeLessThan(-0.2)
     expect(roaming.quarterTrend!.comparison.verdict).toBe('notable')
+  })
+
+  it('badges exactly one intent across the whole quarter', () => {
+    // The point of the materiality threshold. Before it, 12 of 25 intents
+    // carried an "Improving" badge and buried the one that needed action.
+    const data = run(bounds.firstDay, bounds.lastDay)
+    const rows = buildIntentRows(data, {
+      weekStarts: data.weekStarts,
+      firstDay: bounds.firstDay,
+      lastDay: bounds.lastDay,
+    })
+
+    const declining = rows.filter((row) => row.quarterTrend?.declining === true)
+    const improving = rows.filter((row) => row.quarterTrend?.improving === true)
+
+    console.log(
+      `badged intents: ${declining.length} declining, ${improving.length} improving ` +
+        `(of ${rows.length} intents)`,
+    )
+
+    expect(declining).toHaveLength(1)
+    // Improvements are never badged, whatever their size: the UI shows the
+    // arrow and the number and leaves it at that.
+    const badgeCount = declining.length
+    expect(badgeCount).toBe(1)
+  })
+
+  it('does not badge a small-but-significant improvement', () => {
+    // balance_check drifts up by roughly two points across the quarter. On
+    // 90 days of calls that is statistically certain and operationally
+    // nothing, so it must not be flagged.
+    const data = run(bounds.firstDay, bounds.lastDay)
+    const rows = buildIntentRows(data, {
+      weekStarts: data.weekStarts,
+      firstDay: bounds.firstDay,
+      lastDay: bounds.lastDay,
+    })
+
+    const balance = rows.find((row) => INTENTS[row.code]!.id === 'balance_check')!
+    const trend = balance.quarterTrend!
+
+    console.log(
+      `balance_check quarter trend: ${(trend.delta * 100).toFixed(1)} pts, ` +
+        `z = ${trend.comparison.z.toFixed(2)}, verdict ${trend.comparison.verdict}, ` +
+        `significantButSmall ${trend.comparison.significantButSmall}`,
+    )
+
+    expect(Math.abs(trend.delta * 100)).toBeLessThan(SEGMENT_MIN_POINTS)
+    expect(trend.comparison.verdict).toBe('normal')
+    expect(trend.declining).toBe(false)
+    expect(trend.improving).toBe(false)
   })
 
   it('does not flag roaming as improving', () => {
@@ -140,5 +193,58 @@ describe('anomaly 1: the bad deploy', () => {
     const toolError = view.rows.find((row) => row.key === 'tool_error')!
 
     expect(toolError.delta.verdict).not.toBe('notable')
+  })
+})
+
+describe('KPI verdicts use the whole-centre threshold', () => {
+  it('calls a quiet week normal on every KPI', () => {
+    const range = { from: isoToDayIndex('2026-09-20'), to: isoToDayIndex('2026-09-26') }
+    const data = run(range.from, range.to)
+
+    const verdicts = (['resolved', 'transferred', 'abandoned'] as const).map((key) => ({
+      key,
+      comparison: compareRates(
+        data.current[key],
+        data.current.calls,
+        data.previous[key],
+        data.previous.calls,
+        KPI_MIN_POINTS,
+      ),
+    }))
+
+    console.log(
+      'last week KPI verdicts: ' +
+        verdicts
+          .map(
+            (v) => `${v.key} ${(v.comparison.delta * 100).toFixed(2)}pts ${v.comparison.verdict}`,
+          )
+          .join(', '),
+    )
+
+    for (const { key, comparison } of verdicts) {
+      expect(comparison.verdict, key).toBe('normal')
+    }
+  })
+
+  it('calls the bad deploy day a notable drop in resolution', () => {
+    const deployDay = isoToDayIndex('2026-08-25')
+    const data = run(deployDay, deployDay)
+
+    const resolution = compareRates(
+      data.current.resolved,
+      data.current.calls,
+      data.previous.resolved,
+      data.previous.calls,
+      KPI_MIN_POINTS,
+    )
+
+    console.log(
+      `2026-08-25 resolution: ${(resolution.delta * 100).toFixed(2)} pts, ` +
+        `z = ${resolution.z.toFixed(2)}, normal range +/-${(resolution.normalRange * 100).toFixed(2)} pts, ` +
+        `verdict ${resolution.verdict}`,
+    )
+
+    expect(resolution.verdict).toBe('notable')
+    expect(resolution.delta).toBeLessThan(0)
   })
 })

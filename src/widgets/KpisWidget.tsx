@@ -33,6 +33,7 @@ import {
   formatSignedInt,
 } from '../lib/format'
 import { compareCounts, compareRates, type Comparison, type Verdict } from '../lib/stats'
+import { COUNT_MIN_RATIO, KPI_MIN_POINTS } from '../lib/thresholds'
 import { useDrill } from '../state/drill'
 import type { WidgetProps } from './types'
 
@@ -111,11 +112,14 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
     outcome: number,
   ): Kpi => {
     const value = rate(pick(current), current.calls)
+    // The whole centre, not a segment: one point is ~150 calls a week, which
+    // is already worth a line in a weekly report.
     const comparison: Comparison = compareRates(
       pick(current),
       current.calls,
       pick(previous),
       previous.calls,
+      KPI_MIN_POINTS,
     )
 
     return {
@@ -131,7 +135,7 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
     }
   }
 
-  const volume = compareCounts(current.calls, previous.calls)
+  const volume = compareCounts(current.calls, previous.calls, COUNT_MIN_RATIO)
 
   const kpis: Kpi[] = [
     rateKpi('resolution', 'kpi.resolutionRate', (c) => c.resolved, true, 0),

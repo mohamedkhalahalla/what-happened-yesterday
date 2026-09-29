@@ -23,7 +23,23 @@
  *
  * No p-values are shown anywhere. |z| ≥ 2 is roughly p < 0.05 two-tailed, and
  * a director does not need the number to decide whether to open the drill-down.
+ *
+ * ## Significance is necessary, not sufficient
+ *
+ * Both functions take a **minimum effect size**. A change is `notable` only
+ * when it clears the z-test *and* is big enough to act on. Ninety days of
+ * calls will resolve a one-point shift to statistical certainty, which is why
+ * the dashboard once showed twelve "Improving" intents at once and buried the
+ * one that mattered. Statistical significance answers "is this real"; it has
+ * never answered "is this worth your morning".
+ *
+ * A change that clears the z-test but misses the threshold is reported as
+ * `normal`, because from the reader's side it is: nothing to do. The
+ * distinction is kept on the result as {@link Comparison.significantButSmall}
+ * for anyone debugging why a row is quiet.
  */
+
+import { COUNT_MIN_RATIO, SEGMENT_MIN_POINTS, pointsToRatio } from './thresholds'
 
 /** How to read a comparison. */
 export type Verdict =
@@ -37,7 +53,7 @@ export type Verdict =
 /** Below this many observations, the normal approximation is not trustworthy. */
 const MIN_SAMPLE = 30
 
-/** |z| at or above this counts as notable (≈ p < 0.05, two-tailed). */
+/** |z| at or above this clears the significance half of the test (≈ p < 0.05). */
 const NOTABLE_Z = 2
 
 export type Comparison = {
@@ -48,11 +64,59 @@ export type Comparison = {
   /** Standardised difference. Zero when it cannot be computed. */
   z: number
   verdict: Verdict
+  /**
+   * Half-width of the band this metric wanders inside on its own: 2 × SE, in
+   * the same units as `delta`. This is the number the UI shows as
+   * "normal variation here: ±1.4 pts", and it is what makes a flagged change
+   * on one row and not another legible rather than arbitrary.
+   */
+  normalRange: number
+  /** The minimum effect this comparison was judged against, in `delta` units. */
+  minEffect: number
+  /**
+   * True when the z-test cleared but the change was too small to matter.
+   * Shown to the reader as `normal`; exposed here for diagnosis.
+   */
+  significantButSmall: boolean
 }
 
 /** A rate that is 0/0 is not 0 — it is unknown. Callers get 0 and a verdict. */
 function safeRate(numerator: number, denominator: number): number {
   return denominator > 0 ? numerator / denominator : 0
+}
+
+/** Not enough data to judge: report the difference and decline to interpret it. */
+function insufficient(delta: number, minEffect: number): Comparison {
+  return {
+    delta,
+    se: 0,
+    z: 0,
+    verdict: 'insufficient',
+    normalRange: 0,
+    minEffect,
+    significantButSmall: false,
+  }
+}
+
+/**
+ * Apply both tests. `notable` needs the change to be bigger than noise *and*
+ * bigger than the threshold; clearing only the first is reported as `normal`.
+ */
+function judge(delta: number, se: number, minEffect: number): Comparison {
+  const z = delta / se
+  const significant = Math.abs(z) >= NOTABLE_Z
+  const material = Math.abs(delta) >= minEffect
+
+  return {
+    delta,
+    se,
+    z,
+    verdict: significant && material ? 'notable' : 'normal',
+    // The band the metric wanders in unaided, which is what the tooltip shows.
+    normalRange: NOTABLE_Z * se,
+    minEffect,
+    significantButSmall: significant && !material,
+  }
 }
 
 /**
@@ -67,14 +131,21 @@ function safeRate(numerator: number, denominator: number): number {
  * the same underlying rate", and under that hypothesis the best estimate of
  * that rate uses both samples.
  */
-export function compareRates(k1: number, n1: number, k2: number, n2: number): Comparison {
+export function compareRates(
+  k1: number,
+  n1: number,
+  k2: number,
+  n2: number,
+  minEffectPoints: number = SEGMENT_MIN_POINTS,
+): Comparison {
   const p1 = safeRate(k1, n1)
   const p2 = safeRate(k2, n2)
   const delta = p1 - p2
+  const minEffect = pointsToRatio(minEffectPoints)
 
   // Either period too small: report the difference, refuse to judge it.
   if (n1 < MIN_SAMPLE || n2 < MIN_SAMPLE) {
-    return { delta, se: 0, z: 0, verdict: 'insufficient' }
+    return insufficient(delta, minEffect)
   }
 
   const pooled = (k1 + k2) / (n1 + n2)
@@ -84,11 +155,18 @@ export function compareRates(k1: number, n1: number, k2: number, n2: number): Co
   // or none did, in both periods. There is no observed variation to divide by,
   // and dividing would give Infinity or NaN.
   if (!(se > 0)) {
-    return { delta, se: 0, z: 0, verdict: 'normal' }
+    return {
+      delta,
+      se: 0,
+      z: 0,
+      verdict: 'normal',
+      normalRange: 0,
+      minEffect,
+      significantButSmall: false,
+    }
   }
 
-  const z = delta / se
-  return { delta, se, z, verdict: Math.abs(z) >= NOTABLE_Z ? 'notable' : 'normal' }
+  return judge(delta, se, minEffect)
 }
 
 /**
@@ -102,19 +180,35 @@ export function compareRates(k1: number, n1: number, k2: number, n2: number): Co
  * most bursty thing in the dataset, so treat a "notable" volume change as a
  * prompt to look, never as a finding.
  */
-export function compareCounts(c1: number, c2: number): Comparison {
+export function compareCounts(
+  c1: number,
+  c2: number,
+  minEffectRatio: number = COUNT_MIN_RATIO,
+): Comparison {
   const delta = c1 - c2
   const total = c1 + c2
 
+  // Relative to the baseline, so "5% more calls" means the same thing at any
+  // volume. With no baseline, any change at all is infinitely large, so the
+  // threshold is simply one call.
+  const minEffect = c2 > 0 ? c2 * minEffectRatio : 1
+
   if (total < MIN_SAMPLE) {
-    return { delta, se: 0, z: 0, verdict: 'insufficient' }
+    return insufficient(delta, minEffect)
   }
 
   const se = Math.sqrt(total)
   if (!(se > 0)) {
-    return { delta, se: 0, z: 0, verdict: 'normal' }
+    return {
+      delta,
+      se: 0,
+      z: 0,
+      verdict: 'normal',
+      normalRange: 0,
+      minEffect,
+      significantButSmall: false,
+    }
   }
 
-  const z = delta / se
-  return { delta, se, z, verdict: Math.abs(z) >= NOTABLE_Z ? 'notable' : 'normal' }
+  return judge(delta, se, minEffect)
 }

@@ -12,10 +12,10 @@
 
 import { useMemo, useState } from 'react'
 
+import { DeltaValue } from '../components/DeltaValue'
 import { intentLabel } from '../i18n/dictionary'
 import { useI18n } from '../i18n/useI18n'
 import { formatInt, formatPercent, formatPointsDelta } from '../lib/format'
-import type { Verdict } from '../lib/stats'
 import { useDrill } from '../state/drill'
 import { Sparkline } from './Sparkline'
 import {
@@ -40,11 +40,6 @@ const COLUMNS: {
   { key: 'unresolved', labelKey: 'intents.col.unresolved', numeric: true },
   { key: 'quarter', labelKey: 'intents.col.quarter', numeric: true },
 ]
-
-/** Only a notable verdict is worth ink; the rest stay quiet but still readable. */
-function verdictClass(verdict: Verdict): string {
-  return verdict === 'notable' ? 'text-foreground' : 'text-muted-foreground'
-}
 
 export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetProps) {
   const { lang, t } = useI18n()
@@ -188,10 +183,14 @@ export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetPr
                   )}
                 </td>
 
-                <td
-                  className={`px-2 py-1 text-end tabular-nums ${verdictClass(row.delta.verdict)}`}
-                >
-                  {showDelta ? formatPointsDelta(lang, row.delta.delta) : '—'}
+                <td className="px-2 py-1 text-end tabular-nums">
+                  {showDelta ? (
+                    <DeltaValue comparison={row.delta}>
+                      {formatPointsDelta(lang, row.delta.delta)}
+                    </DeltaValue>
+                  ) : (
+                    '—'
+                  )}
                 </td>
 
                 <td className="px-2 py-1 text-end tabular-nums">
@@ -218,23 +217,23 @@ export function IntentTableWidget({ data, filters, bounds, showDelta }: WidgetPr
                   {trend === null ? (
                     '—'
                   ) : (
-                    <span className={verdictClass(trend.comparison.verdict)}>
+                    <DeltaValue comparison={trend.comparison}>
                       <span aria-hidden className="text-[9px]">
                         {trend.delta < 0 ? '▼' : trend.delta > 0 ? '▲' : '—'}
-                      </span>{' '}
-                      {formatPointsDelta(lang, trend.delta)}
-                      {/* A word, not just a colour or an arrow. */}
+                      </span>
+                      <span>{formatPointsDelta(lang, trend.delta)}</span>
+                      {/*
+                        A badge only where there is something to do. Improvements
+                        get the arrow and the number and nothing else: a badge on
+                        every improving row is what buried the one declining row
+                        in review.
+                      */}
                       {trend.declining && (
                         <span className="ms-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-foreground">
                           {t('intents.declining')}
                         </span>
                       )}
-                      {trend.improving && (
-                        <span className="ms-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          {t('intents.improving')}
-                        </span>
-                      )}
-                    </span>
+                    </DeltaValue>
                   )}
                 </td>
 
