@@ -46,7 +46,7 @@ export function ValueAxis({
   asPercent = false,
   percentDigits = 0,
 }: ValueAxisProps) {
-  const ticks = scale.ticks(tickCount)
+  const ticks = axisTicks(scale, tickCount)
   const axisX = direction.valueAxisX(innerWidth)
   // Labels hang off the axis, away from the plot.
   const labelX = axisX + (direction.isRtl ? 8 : -8)
@@ -101,6 +101,28 @@ export function TimeAxis({ ticks, x, y, lang }: TimeAxisProps) {
       ))}
     </g>
   )
+}
+
+/**
+ * Ticks that always include the top of the domain.
+ *
+ * `d3.ticks` picks round numbers *inside* the domain, so a 0-28.4% axis gets
+ * 0/10/20% and the tallest bar sails past the last label with nothing to read
+ * it against. Manual testing flagged exactly that: a bar that looked clipped.
+ * Appending the domain maximum guarantees the tallest value has a label at or
+ * above it, and a near-duplicate is dropped so 20% and 20.1% do not collide.
+ */
+export function axisTicks(scale: ScaleLinear<number, number>, count: number): number[] {
+  const [, max] = scale.domain() as [number, number]
+  const ticks = scale.ticks(count).filter((tick) => tick <= max)
+
+  const last = ticks[ticks.length - 1]
+  // Within a twentieth of the range counts as "already labelled".
+  const tooClose = last !== undefined && Math.abs(max - last) < Math.abs(max) / 20
+  if (tooClose) ticks.pop()
+
+  if (ticks[ticks.length - 1] !== max) ticks.push(max)
+  return ticks
 }
 
 /**

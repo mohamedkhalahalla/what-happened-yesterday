@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { scaleLinear } from 'd3-scale'
 
 import { isoToDayIndex } from '../lib/time/riyadh'
-import { thinTicks } from './Axis'
+import { axisTicks, thinTicks } from './Axis'
 import { moveCursor } from './cursor'
 import { chartDirection } from './direction'
 
@@ -137,5 +137,39 @@ describe('thinTicks', () => {
 
   it('handles an empty input', () => {
     expect(thinTicks([], 800)).toEqual([])
+  })
+})
+
+describe('axisTicks', () => {
+  it('always includes the domain maximum, so the tallest bar has a label', () => {
+    // 0-28.4% would otherwise be labelled 0/10/20% and the tallest bar would
+    // sail past the last tick with nothing to read it against.
+    const scale = scaleLinear().domain([0, 0.284]).range([100, 0])
+    const ticks = axisTicks(scale, 3)
+
+    expect(ticks[ticks.length - 1]).toBeCloseTo(0.284, 10)
+    expect(ticks[0]).toBe(0)
+  })
+
+  it('never emits a tick above the domain maximum', () => {
+    for (const max of [0.05, 0.1, 0.284, 0.5, 1]) {
+      const scale = scaleLinear().domain([0, max]).range([100, 0])
+      for (const tick of axisTicks(scale, 3)) {
+        expect(tick, `max ${max}`).toBeLessThanOrEqual(max)
+      }
+    }
+  })
+
+  it('drops a round tick that would collide with the maximum', () => {
+    const scale = scaleLinear().domain([0, 0.201]).range([100, 0])
+    const ticks = axisTicks(scale, 3)
+    // 20% and 20.1% must not both appear.
+    expect(ticks.filter((tick) => Math.abs(tick - 0.2) < 0.005)).toHaveLength(1)
+  })
+
+  it('keeps a clean scale clean', () => {
+    const scale = scaleLinear().domain([0, 1]).range([100, 0])
+    expect(axisTicks(scale, 4)).toContain(1)
+    expect(axisTicks(scale, 4)[0]).toBe(0)
   })
 })

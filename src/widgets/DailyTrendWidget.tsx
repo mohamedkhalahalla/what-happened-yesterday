@@ -38,9 +38,18 @@ import {
 } from './dailyTrendData'
 import type { WidgetProps } from './types'
 
-const RESOLUTION_HEIGHT = 150
-const TOOL_ERROR_HEIGHT = 96
+const PANEL_TITLE_HEIGHT = 14
+const RESOLUTION_HEIGHT = 140
+/** Blank band between the panels, so two plots do not read as one. */
+const PANEL_GAP = 16
+const TOOL_ERROR_HEIGHT = 84
 const AXIS_HEIGHT = 18
+
+/** Where each panel's plot area begins, measured from the top of the SVG. */
+const RESOLUTION_TOP = PANEL_TITLE_HEIGHT
+const TOOL_ERROR_TITLE_TOP = RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP
+const TOOL_ERROR_TOP = TOOL_ERROR_TITLE_TOP + PANEL_TITLE_HEIGHT
+const TOTAL_HEIGHT = TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT + AXIS_HEIGHT
 
 /** Room for the value-axis labels on the inline-start side. */
 const GUTTER = 42
@@ -212,7 +221,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
       view={view}
       onViewChange={setView}
     >
-      <ResponsiveSvg height={RESOLUTION_HEIGHT + TOOL_ERROR_HEIGHT + AXIS_HEIGHT}>
+      <ResponsiveSvg height={TOTAL_HEIGHT}>
         {(width) => {
           const innerWidth = Math.max(10, width - GUTTER)
           // The gutter sits on the inline-start side, which is the right in RTL.
@@ -253,8 +262,22 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
 
           return (
             <>
+              {/*
+                Each panel is titled in the chart itself. Manual testing found
+                two stacked plots with one shared legend ambiguous: nothing on
+                screen said which was which.
+              */}
+              <text
+                x={originX}
+                y={PANEL_TITLE_HEIGHT - 4}
+                textAnchor={direction.endAnchor}
+                className="fill-card-foreground text-[10.5px] font-medium"
+              >
+                {t('trend.resolutionPanel')}
+              </text>
+
               {/* Panel 1: resolution rate */}
-              <g transform={`translate(${originX}, 0)`}>
+              <g transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
                 {weekends.map((point) => (
                   <rect
                     key={point.dayIndex}
@@ -294,8 +317,27 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                 )}
               </g>
 
+              {/* A hairline between the panels, reinforcing the blank gap. */}
+              <line
+                x1={originX}
+                x2={originX + innerWidth}
+                y1={RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP / 2}
+                y2={RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP / 2}
+                className="stroke-border"
+                strokeWidth={1}
+              />
+
+              <text
+                x={originX}
+                y={TOOL_ERROR_TITLE_TOP + PANEL_TITLE_HEIGHT - 4}
+                textAnchor={direction.endAnchor}
+                className="fill-card-foreground text-[10.5px] font-medium"
+              >
+                {t('trend.toolErrorPanel')}
+              </text>
+
               {/* Panel 2: tool-error rate */}
-              <g transform={`translate(${originX}, ${RESOLUTION_HEIGHT})`}>
+              <g transform={`translate(${originX}, ${TOOL_ERROR_TOP})`}>
                 {band(filters.range.from, filters.range.to, 'fill-accent', TOOL_ERROR_HEIGHT)}
 
                 <ValueAxis
@@ -303,7 +345,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                   direction={direction}
                   innerWidth={innerWidth}
                   lang={lang}
-                  tickCount={2}
+                  tickCount={3}
                   asPercent
                 />
 
@@ -325,7 +367,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               </g>
 
               {/* Shared time axis */}
-              <g transform={`translate(${originX}, ${RESOLUTION_HEIGHT + TOOL_ERROR_HEIGHT + 2})`}>
+              <g transform={`translate(${originX}, ${TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT + 2})`}>
                 <TimeAxis
                   ticks={thinTicks(sundays, innerWidth)}
                   x={(dayIndex) => x(dayIndex)}
@@ -335,7 +377,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               </g>
 
               {/* Invisible hit targets: one per day, for hover and click. */}
-              <g transform={`translate(${originX}, 0)`}>
+              <g transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
                 {points.map((point, index) => (
                   <rect
                     key={point.dayIndex}
@@ -343,7 +385,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                     x={x(point.dayIndex) - dayWidth / 2}
                     y={0}
                     width={Math.max(1, dayWidth)}
-                    height={RESOLUTION_HEIGHT + TOOL_ERROR_HEIGHT}
+                    height={TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT - RESOLUTION_TOP}
                     className="fill-transparent"
                     onMouseEnter={() => setCursor(index)}
                     onClick={() => drillToDay(point)}

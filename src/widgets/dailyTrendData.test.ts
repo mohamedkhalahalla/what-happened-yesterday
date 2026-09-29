@@ -187,6 +187,44 @@ describe('summarizeTrend', () => {
   })
 })
 
+describe('niceRateMax never clips the tallest bar', () => {
+  /**
+   * The invariant that matters for the chart: the axis domain maximum is
+   * always at or above the highest daily rate. If it were not, the tallest
+   * bar would be drawn past the top of its panel and read as clipped.
+   */
+  it('is at least the highest daily rate, across many shapes of data', () => {
+    const shapes: number[][] = [
+      [1, 5, 12, 3],
+      [21, 4, 9],
+      [50],
+      [99],
+      [100],
+      [0, 0, 0],
+      [4, 4, 4, 4],
+      [19, 20, 21],
+      [0, 100],
+    ]
+
+    for (const errorCounts of shapes) {
+      const points = prepareDaily(
+        errorCounts.map((errors) => counts({ calls: 100, resolved: 50, toolErrorCalls: errors })),
+        FIRST,
+      )
+      const max = niceRateMax(points, (p) => p.toolErrorRate)
+      const highest = Math.max(...points.map((p) => p.toolErrorRate ?? 0))
+
+      expect(max, JSON.stringify(errorCounts)).toBeGreaterThanOrEqual(highest)
+    }
+  })
+
+  it('leaves headroom above the highest bar rather than touching it exactly', () => {
+    // A bar flush with the top of the panel looks clipped even when it is not.
+    const points = prepareDaily([counts({ calls: 100, resolved: 50, toolErrorCalls: 20 })], FIRST)
+    expect(niceRateMax(points, (p) => p.toolErrorRate)).toBeGreaterThan(0.2)
+  })
+})
+
 describe('niceRateMax', () => {
   it('never returns less than 5 points, so a quiet quarter is not magnified', () => {
     const points = prepareDaily([counts({ calls: 100, resolved: 100, toolErrorCalls: 1 })], FIRST)
