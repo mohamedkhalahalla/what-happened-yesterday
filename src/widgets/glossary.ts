@@ -24,6 +24,10 @@ export type GlossaryTermId =
   | 'handoffReason'
   | 'previousPeriod'
   | 'points'
+  | 'per100'
+  | 'median'
+  | 'unresolved'
+  | 'notable'
 
 export type GlossaryTerm = {
   id: GlossaryTermId
@@ -81,6 +85,26 @@ export const GLOSSARY: Record<GlossaryTermId, GlossaryTerm> = {
     id: 'points',
     termKey: 'glossary.points',
     definitionKey: 'glossary.points.def',
+  },
+  per100: {
+    id: 'per100',
+    termKey: 'glossary.per100',
+    definitionKey: 'glossary.per100.def',
+  },
+  median: {
+    id: 'median',
+    termKey: 'glossary.median',
+    definitionKey: 'glossary.median.def',
+  },
+  unresolved: {
+    id: 'unresolved',
+    termKey: 'glossary.unresolved',
+    definitionKey: 'glossary.unresolved.def',
+  },
+  notable: {
+    id: 'notable',
+    termKey: 'glossary.notable',
+    definitionKey: 'glossary.notable.def',
   },
 }
 

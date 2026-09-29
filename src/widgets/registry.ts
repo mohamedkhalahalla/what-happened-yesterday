@@ -81,7 +81,15 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     descriptionKey: 'widget.intentTable.description',
     defaultSize: { w: 12, h: 'L' },
     minSize: { w: 6, h: 'M' },
-    glossary: ['resolutionRate', 'resolved', 'transferred', 'points', 'previousPeriod'],
+    glossary: [
+      'unresolved',
+      'resolutionRate',
+      'resolved',
+      'transferred',
+      'points',
+      'notable',
+      'previousPeriod',
+    ],
     component: IntentTableWidget,
   },
   agentComparison: {
@@ -90,7 +98,7 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     descriptionKey: 'widget.agentComparison.description',
     defaultSize: { w: 6, h: 'M' },
     minSize: { w: 4, h: 'S' },
-    glossary: ['transferRate', 'transferred', 'resolutionRate', 'previousPeriod'],
+    glossary: ['transferRate', 'transferred', 'median', 'notable', 'previousPeriod'],
     component: AgentComparisonWidget,
   },
   failureReasons: {
@@ -99,7 +107,7 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     descriptionKey: 'widget.failureReasons.description',
     defaultSize: { w: 6, h: 'M' },
     minSize: { w: 4, h: 'S' },
-    glossary: ['handoffReason', 'toolError', 'transferred', 'abandoned'],
+    glossary: ['per100', 'handoffReason', 'toolError', 'abandoned', 'notable', 'previousPeriod'],
     component: FailureReasonsWidget,
   },
   peakHours: {
