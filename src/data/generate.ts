@@ -6,9 +6,13 @@
  * at a time. Rows therefore come out sorted by `startedAt` globally, which is
  * what makes `dayStartRow` a usable slicing index.
  *
- * This is the only non-test module allowed to import {@link STORY}: the three
- * anomalies are *planted* here, and every other part of the app has to
- * discover them from the data the way the director would.
+ * This is the only non-test module allowed to import {@link STORY} or the
+ * story plan: the three anomalies are *planted* here, and every other part of
+ * the app has to discover them from the data the way the director would.
+ *
+ * **Where** they are planted is the seed's decision, not this file's — see
+ * `story.ts`. This file knows that some agent over-transfers; it does not know
+ * which one until it asks.
  *
  * ## The `anomalies` switch
  *
@@ -65,7 +69,8 @@ import {
   TRANSFER_SHARE_OF_UNRESOLVED,
   WEEKDAY_VOLUME,
 } from './config'
-import { AGENTS, HANDOFF_REASONS, INTENTS, agentIndex, intentIndex } from './dictionaries'
+import { AGENTS, HANDOFF_REASONS, INTENTS } from './dictionaries'
+import { storyFor, type StoryPlan } from './story'
 import { clamp, lerp, lognormal, mulberry32, normal, pickWeighted, sum, type Rng } from './prng'
 import { NO_HANDOFF, type Dataset } from './types'
 
@@ -79,9 +84,6 @@ const ABANDONED = 2
 // Handoff codes, matching the HANDOFF_REASONS array order.
 const LOW_CONFIDENCE = HANDOFF_REASONS.indexOf('low_confidence')
 const TOOL_ERROR = HANDOFF_REASONS.indexOf('tool_error')
-
-const ROAMING = intentIndex(STORY.degradingIntent.intentId)
-const MAJED = agentIndex(STORY.overTransferringAgent.agentId)
 
 // Totals precomputed once rather than re-summed 200k times.
 const INTENT_WEIGHTS = INTENTS.map((it) => it.weight)
@@ -99,12 +101,14 @@ type DayContext = {
   dayIndex: number
   /** Resolve-rate bonus from the gentle quarter-long improvement. */
   resolveTrend: number
-  /** Where roaming's decaying resolve rate has got to on this day. */
-  roamingResolve: number
+  /** Where the declining intent's resolve rate has got to on this day. */
+  decliningResolve: number
   /** True on the day the bad deploy shipped. Always false without anomalies. */
   isDeployDay: boolean
-  /** Whether roaming follows its decaying ramp rather than its ordinary rate. */
-  roamingDegrades: boolean
+  /** Whether the declining intent follows its ramp rather than its own rate. */
+  intentDegrades: boolean
+  /** Which agent, intent and hours this seed chose. */
+  plan: StoryPlan
   hourly: readonly number[]
   hourlyTotal: number
 }
@@ -204,21 +208,19 @@ function resolveOdds(
   toolErrors: number,
   ctx: DayContext,
 ): { p: number; pWithoutDecline: number } {
-  // Without the planted decline, roaming is just another intent.
-  const isRoaming = intentCode === ROAMING && ctx.roamingDegrades
-  // Roaming follows its own ramp and deliberately ignores the rising trend.
-  const base = isRoaming ? ctx.roamingResolve : INTENTS[intentCode]!.baseResolve + ctx.resolveTrend
+  // Without the planted decline, the chosen intent is just another intent.
+  const isDeclining = intentCode === ctx.plan.intent && ctx.intentDegrades
+  // It follows its own ramp and deliberately ignores the rising trend.
+  const base = isDeclining
+    ? ctx.decliningResolve
+    : INTENTS[intentCode]!.baseResolve + ctx.resolveTrend
   const languageAdjust = LANGUAGE_RESOLVE_ADJUST[languageCode]!
   const toolPenalty = toolErrors > 0 ? TOOL_ERROR_RESOLVE_PENALTY : 1
 
   const p = clamp((base + languageAdjust) * toolPenalty, 0, 1)
-  if (!isRoaming) return { p, pWithoutDecline: p }
+  if (!isDeclining) return { p, pWithoutDecline: p }
 
-  const undegraded = clamp(
-    (STORY.degradingIntent.startResolve + languageAdjust) * toolPenalty,
-    0,
-    1,
-  )
+  const undegraded = clamp((ctx.plan.intentStartResolve + languageAdjust) * toolPenalty, 0, 1)
   return { p, pWithoutDecline: undegraded }
 }
 
@@ -263,7 +265,7 @@ function allocateDataset(n: number, firstDay: number): Dataset {
 function buildDayContext(
   offset: number,
   firstDay: number,
-  deployDay: number,
+  plan: StoryPlan,
   ramadanFrom: number,
   ramadanTo: number,
   anomalies: boolean,
@@ -276,13 +278,10 @@ function buildDayContext(
     offset,
     dayIndex,
     resolveTrend: QUARTER_RESOLVE_TREND * progress,
-    roamingResolve: lerp(
-      STORY.degradingIntent.startResolve,
-      STORY.degradingIntent.endResolve,
-      progress,
-    ),
-    isDeployDay: anomalies && dayIndex === deployDay,
-    roamingDegrades: anomalies,
+    decliningResolve: lerp(plan.intentStartResolve, plan.intentEndResolve, progress),
+    isDeployDay: anomalies && dayIndex === plan.deployDay,
+    intentDegrades: anomalies,
+    plan,
     hourly: inRamadan ? RAMADAN_HOURLY : NORMAL_HOURLY,
     hourlyTotal: inRamadan ? RAMADAN_HOURLY_TOTAL : NORMAL_HOURLY_TOTAL,
   }
@@ -300,13 +299,14 @@ function decideOutcome(
   intentCode: number,
   toolErrors: number,
   odds: { p: number; pWithoutDecline: number },
+  plan: StoryPlan,
   anomalies: boolean,
 ): { outcome: number; handoff: number } {
   const u = rng()
 
   if (u < odds.p) {
     // Majed hands off calls the other agents would have finished themselves.
-    if (agentCode === MAJED) {
+    if (agentCode === plan.agent) {
       /*
        * The draw happens either way, so switching the anomaly off changes
        * what Majed does with a call and not which random numbers the rest of
@@ -319,7 +319,7 @@ function decideOutcome(
     return { outcome: RESOLVED, handoff: NO_HANDOFF }
   }
 
-  if (intentCode === ROAMING && u < odds.pWithoutDecline) {
+  if (intentCode === plan.intent && u < odds.pWithoutDecline) {
     // A failure the roaming decline is directly responsible for.
     return rng() < STORY.degradingIntent.extraFailureTransferShare
       ? { outcome: TRANSFERRED, handoff: LOW_CONFIDENCE }
@@ -350,7 +350,7 @@ function fillRow(
   const intentCode = pickWeighted(rng, INTENT_WEIGHTS, INTENT_WEIGHT_TOTAL)
 
   const inDeployWindow =
-    ctx.isDeployDay && hour >= STORY.badDeploy.fromHour && hour <= STORY.badDeploy.toHour
+    ctx.isDeployDay && hour >= ctx.plan.deployHours.from && hour <= ctx.plan.deployHours.to
   const toolErrors = drawToolErrors(rng, intentCode, inDeployWindow)
 
   const odds = resolveOdds(intentCode, languageCode, toolErrors, ctx)
@@ -360,6 +360,7 @@ function fillRow(
     intentCode,
     toolErrors,
     odds,
+    ctx.plan,
     anomalies,
   )
 
@@ -401,7 +402,11 @@ export function generateDataset(
   const rng = mulberry32(seed)
   // Data ends the day before "today", so the window starts DAYS days before it.
   const firstDay = isoToDayIndex(ANCHOR_TODAY_ISO) - DAYS
-  const deployDay = isoToDayIndex(STORY.badDeploy.dateISO)
+  /*
+   * Drawn from its own stream, so asking where the anomalies go does not move
+   * a single call in the data. See `story.ts`.
+   */
+  const plan = storyFor(seed)
   const ramadanFrom = isoToDayIndex(RAMADAN.fromISO)
   const ramadanTo = isoToDayIndex(RAMADAN.toISO)
 
@@ -412,7 +417,7 @@ export function generateDataset(
   let row = 0
   for (let offset = 0; offset < DAYS; offset++) {
     ds.dayStartRow[offset] = row
-    const ctx = buildDayContext(offset, firstDay, deployDay, ramadanFrom, ramadanTo, anomalies)
+    const ctx = buildDayContext(offset, firstDay, plan, ramadanFrom, ramadanTo, anomalies)
 
     for (const epochSec of drawDayTimestamps(rng, ctx, callsPerDay[offset]!)) {
       fillRow(ds, row, epochSec, ctx, rng, anomalies)

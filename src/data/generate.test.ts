@@ -198,6 +198,31 @@ describe('dataset structure', () => {
 // --- determinism -----------------------------------------------------------
 
 describe('determinism', () => {
+  /*
+   * The default dataset, pinned.
+   *
+   * Every number in the README, the screenshots and half the assertions in
+   * this repo describe *this* quarter. A refactor that changes it by one call
+   * invalidates all of them silently — the tests that compare two runs of the
+   * generator would still pass, because both runs moved together. A literal
+   * is the only thing that notices.
+   *
+   * If this fails and the change was deliberate, recompute both hashes, check
+   * the README numbers again, and update them in the same commit.
+   */
+  const DEFAULT_HASH = '62bc0f09'
+  const DEFAULT_HASH_WITHOUT_ANOMALIES = 'd8f0437f'
+
+  it('still produces the exact dataset the README describes', () => {
+    expect(hashDataset(ds)).toBe(DEFAULT_HASH)
+  })
+
+  it('still produces the exact anomaly-free dataset the precision tests use', () => {
+    expect(hashDataset(generateDataset(SEED, { anomalies: false }))).toBe(
+      DEFAULT_HASH_WITHOUT_ANOMALIES,
+    )
+  })
+
   it('produces an identical dataset for the same seed', () => {
     expect(hashDataset(generateDataset(SEED))).toBe(hashDataset(ds))
   })
