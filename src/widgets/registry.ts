@@ -162,6 +162,9 @@ export function isWidgetId(value: unknown): value is WidgetId {
  * machinery stays, because the next widget will use it.
  */
 export const DEFAULT_WIDGET_IDS: readonly WidgetId[] = [
+  // First, because it is the answer to the question the other five are
+  // evidence for. A reader who stops after one widget should have read this.
+  'fixFirst',
   'kpis',
   'dailyTrend',
   'intentTable',

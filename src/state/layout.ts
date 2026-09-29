@@ -26,9 +26,24 @@ import {
   type WidgetWidth,
 } from '../widgets/registry'
 
-export const LAYOUT_VERSION = 1
+/**
+ * The shape of a stored layout.
+ *
+ * 1 → 2 added the Fix-first widget at the top of the canvas. Versioned rather
+ * than silently accepted, because a v1 layout is missing a widget the app now
+ * leads with, and the stored version is the only thing that tells "this person
+ * removed it" apart from "this layout predates it".
+ */
+export const LAYOUT_VERSION = 2
 
-/** Storage key prefix. The per-user id is appended. */
+/**
+ * Storage key prefix. The per-user id is appended.
+ *
+ * Still says `v1` after the bump, deliberately: the version lives in the
+ * payload, and moving the key would hide every stored layout from the
+ * migration rather than migrating it — which is the one thing a migration
+ * exists to prevent.
+ */
 const LAYOUT_KEY_PREFIX = 'wy.layout.v1.'
 
 export type LayoutItem = {
@@ -181,9 +196,14 @@ export function validateLayout(raw: unknown): Layout {
   if (typeof raw !== 'object' || raw === null) return defaultLayout()
 
   const candidate = raw as { version?: unknown; items?: unknown }
-  // A different version means a different shape; migrating is not worth it for
-  // a layout the user can rebuild in three clicks.
-  if (candidate.version !== LAYOUT_VERSION) return defaultLayout()
+  /*
+   * Two versions are readable: the current one, and v1 through the migration
+   * below. Anything else — a future version, a string, a missing one — is a
+   * shape this code has never seen, and guessing at it would produce a canvas
+   * nobody arranged. Starting fresh is the honest failure.
+   */
+  const fromV1 = candidate.version === 1
+  if (candidate.version !== LAYOUT_VERSION && !fromV1) return defaultLayout()
   if (!Array.isArray(candidate.items)) return defaultLayout()
 
   const items: LayoutItem[] = []
@@ -219,6 +239,26 @@ export function validateLayout(raw: unknown): Layout {
   // An empty canvas is a valid thing to want — the person removed everything —
   // but an items array that was entirely garbage is not.
   if (items.length === 0 && candidate.items.length > 0) return defaultLayout()
+
+  /*
+   * The v1 → v2 migration, and the whole reason this function reads two
+   * versions. Fix first goes at the top because that is where the thing you
+   * should read first belongs, and because appending it would put the
+   * dashboard's summary of what is wrong below five widgets of detail.
+   *
+   * Everything else is left exactly as it was arranged: order, widths,
+   * heights, omissions. A migration that also "tidied" the canvas would be
+   * taking a layout someone built and handing back one they did not.
+   *
+   * An emptied v1 canvas gets it too. "If absent, insert" is the rule, and a
+   * person who cleared their canvas before this widget existed never decided
+   * anything about it — they can remove it once, and the v2 save will respect
+   * that from then on.
+   */
+  if (fromV1 && !items.some((item) => item.id === 'fixFirst')) {
+    const { defaultSize } = WIDGETS.fixFirst
+    items.unshift({ id: 'fixFirst', w: defaultSize.w, h: defaultSize.h })
+  }
 
   return { version: LAYOUT_VERSION, items }
 }

@@ -244,8 +244,8 @@ describe('validateLayout', () => {
     ['a missing version', { items: [] }],
     ['a future version', { version: 99, items: [{ id: 'kpis', w: 12, h: 'M' }] }],
     ['a string version', { version: '1', items: [] }],
-    ['items that are not an array', { version: 1, items: 'kpis' }],
-    ['items null', { version: 1, items: null }],
+    ['items that are not an array', { version: LAYOUT_VERSION, items: 'kpis' }],
+    ['items null', { version: LAYOUT_VERSION, items: null }],
   ])('falls back to the default for %s', (_name, input) => {
     expect(validateLayout(input)).toEqual(defaultLayout())
   })
@@ -258,7 +258,7 @@ describe('validateLayout', () => {
     expect(WIDGETS.agentComparison.minSize.h).toBe('M')
 
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [{ id: 'agentComparison', w: 6, h: 'S' }],
     })
 
@@ -266,13 +266,16 @@ describe('validateLayout', () => {
   })
 
   it('raises a saved width below the widget minimum too', () => {
-    const layout = validateLayout({ version: 1, items: [{ id: 'kpis', w: 4, h: 'M' }] })
+    const layout = validateLayout({
+      version: LAYOUT_VERSION,
+      items: [{ id: 'kpis', w: 4, h: 'M' }],
+    })
     expect(layout.items[0]!.w).toBe(WIDGETS.kpis.minSize.w)
   })
 
   it('leaves a saved size at or above the minimum alone', () => {
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [
         { id: 'agentComparison', w: 6, h: 'L' },
         { id: 'dailyTrend', w: 8, h: 'M' },
@@ -285,7 +288,7 @@ describe('validateLayout', () => {
   it('never returns a layout containing a size below its widget minimum', () => {
     // Whatever went in, nothing comes out that cannot be drawn.
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: WIDGET_IDS.map((id) => ({ id, w: 4, h: 'S' })),
     })
 
@@ -301,7 +304,7 @@ describe('validateLayout', () => {
     // localStorage. Validation must quietly drop it rather than rendering a
     // widget with no component, and must keep the rest of their layout.
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [
         { id: 'kpis', w: 12, h: 'M' },
         { id: 'peakHours', w: 6, h: 'M' },
@@ -315,14 +318,14 @@ describe('validateLayout', () => {
 
   it('falls back to the default when peakHours was the only widget saved', () => {
     // Every entry was garbage, so there is no layout left to honour.
-    expect(validateLayout({ version: 1, items: [{ id: 'peakHours', w: 6, h: 'M' }] })).toEqual(
-      defaultLayout(),
-    )
+    expect(
+      validateLayout({ version: LAYOUT_VERSION, items: [{ id: 'peakHours', w: 6, h: 'M' }] }),
+    ).toEqual(defaultLayout())
   })
 
   it('drops unknown widget ids', () => {
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [
         { id: 'kpis', w: 12, h: 'M' },
         { id: 'weatherForecast', w: 6, h: 'M' },
@@ -334,7 +337,7 @@ describe('validateLayout', () => {
 
   it('drops duplicate ids, keeping the first', () => {
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [
         { id: 'kpis', w: 12, h: 'M' },
         { id: 'kpis', w: 6, h: 'S' },
@@ -346,7 +349,7 @@ describe('validateLayout', () => {
 
   it('replaces an invalid size with that widget default', () => {
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [
         { id: 'kpis', w: 7, h: 'XL' },
         { id: 'dailyTrend', w: null, h: undefined },
@@ -366,7 +369,7 @@ describe('validateLayout', () => {
 
   it('skips entries that are not objects', () => {
     const layout = validateLayout({
-      version: 1,
+      version: LAYOUT_VERSION,
       items: [null, 'kpis', 7, { id: 'kpis', w: 12, h: 'M' }],
     })
     expect(ids(layout)).toEqual(['kpis'])
@@ -375,19 +378,24 @@ describe('validateLayout', () => {
   it('keeps a deliberately emptied canvas empty', () => {
     // Removing every widget is a thing a person can do, and reloading should
     // not silently undo it.
-    expect(validateLayout({ version: 1, items: [] })).toEqual({ version: 1, items: [] })
+    expect(validateLayout({ version: LAYOUT_VERSION, items: [] })).toEqual({
+      version: LAYOUT_VERSION,
+      items: [],
+    })
   })
 
   it('falls back when every entry was garbage', () => {
     // As opposed to the case above: the person did not empty this, it rotted.
-    expect(validateLayout({ version: 1, items: [{ id: 'nope' }, null] })).toEqual(defaultLayout())
+    expect(validateLayout({ version: LAYOUT_VERSION, items: [{ id: 'nope' }, null] })).toEqual(
+      defaultLayout(),
+    )
   })
 
   it('never throws, whatever it is handed', () => {
     const nasty: unknown[] = [
-      { version: 1, items: [{ id: { nested: true }, w: [], h: {} }] },
-      { version: 1, items: [{}] },
-      { version: 1, items: [[]] },
+      { version: LAYOUT_VERSION, items: [{ id: { nested: true }, w: [], h: {} }] },
+      { version: LAYOUT_VERSION, items: [{}] },
+      { version: LAYOUT_VERSION, items: [[]] },
       Object.create(null),
       new Date(0),
     ]
@@ -395,6 +403,83 @@ describe('validateLayout', () => {
       expect(() => validateLayout(input)).not.toThrow()
       expect(validateLayout(input).version).toBe(LAYOUT_VERSION)
     }
+  })
+})
+
+describe('migration from v1', () => {
+  /*
+   * A stored v1 layout was arranged by a person, before Fix first existed.
+   * The migration owes them two things: the new widget, since the app now
+   * leads with it, and everything else exactly where they left it.
+   */
+  it('inserts Fix first at the top and keeps the rest of a custom order', () => {
+    const layout = validateLayout({
+      version: 1,
+      items: [
+        { id: 'failureReasons', w: 6, h: 'M' },
+        { id: 'kpis', w: 6, h: 'S' },
+        { id: 'dailyTrend', w: 12, h: 'L' },
+      ],
+    })
+
+    expect(layout.version).toBe(LAYOUT_VERSION)
+    expect(ids(layout)).toEqual(['fixFirst', 'failureReasons', 'kpis', 'dailyTrend'])
+
+    // Their sizes, untouched — including the ones that are not the defaults.
+    expect(layout.items[1]).toEqual({ id: 'failureReasons', w: 6, h: 'M' })
+    expect(layout.items[2]).toEqual({ id: 'kpis', w: 6, h: 'S' })
+    expect(layout.items[3]).toEqual({ id: 'dailyTrend', w: 12, h: 'L' })
+
+    // And it arrives at its own default size.
+    expect(layout.items[0]).toEqual({
+      id: 'fixFirst',
+      w: WIDGETS.fixFirst.defaultSize.w,
+      h: WIDGETS.fixFirst.defaultSize.h,
+    })
+  })
+
+  it('does not move or duplicate a Fix first that is already there', () => {
+    // Possible for anyone who added it from the catalog before reloading.
+    const layout = validateLayout({
+      version: 1,
+      items: [
+        { id: 'kpis', w: 12, h: 'M' },
+        { id: 'fixFirst', w: 6, h: 'S' },
+      ],
+    })
+
+    expect(ids(layout)).toEqual(['kpis', 'fixFirst'])
+    expect(layout.items[1]!.w).toBe(6)
+  })
+
+  it('adds it to a canvas that was emptied before it existed', () => {
+    // "If absent, insert". Nobody decided against a widget that did not exist
+    // when they cleared the canvas, and removing it again now sticks.
+    expect(ids(validateLayout({ version: 1, items: [] }))).toEqual(['fixFirst'])
+  })
+
+  it('starts fresh rather than migrating garbage', () => {
+    for (const input of [
+      { version: 1, items: [{ id: 'nope' }, null] },
+      { version: 1, items: 'kpis' },
+      { version: 0, items: [{ id: 'kpis', w: 12, h: 'M' }] },
+      { version: 99, items: [{ id: 'kpis', w: 12, h: 'M' }] },
+      { version: '1', items: [{ id: 'kpis', w: 12, h: 'M' }] },
+    ]) {
+      expect(validateLayout(input), JSON.stringify(input)).toEqual(defaultLayout())
+    }
+  })
+
+  it('drops widgets that no longer exist while migrating', () => {
+    const layout = validateLayout({
+      version: 1,
+      items: [
+        { id: 'peakHours', w: 6, h: 'M' },
+        { id: 'kpis', w: 12, h: 'M' },
+      ],
+    })
+
+    expect(ids(layout)).toEqual(['fixFirst', 'kpis'])
   })
 })
 
