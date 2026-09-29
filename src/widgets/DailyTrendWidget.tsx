@@ -7,6 +7,11 @@
  * ninety days at once with the selected week marked on them. The date filter
  * moves the highlight; it does not crop the chart.
  *
+ * The callouts come from the same detectors the Fix-first widget reads, not
+ * from a second calculation done locally. Two answers to "was Tuesday an
+ * incident?" on one screen is a contradiction the reader has no way to settle,
+ * and the local one would be the version nobody had tested.
+ *
  * Two stacked panels sharing one time axis rather than a dual-axis chart. A
  * second y-axis lets the reader infer any correlation they like by rescaling
  * one series against the other — the crossing point is an artefact of the
@@ -25,8 +30,16 @@ import { moveCursor } from '../charts/cursor'
 import { chartDirection } from '../charts/direction'
 import { RAMADAN } from '../data/config'
 import { useI18n } from '../i18n/useI18n'
-import { formatDay, formatInt, formatPercent, formatWeekdayShort } from '../lib/format'
+import {
+  formatDay,
+  formatInt,
+  formatPercent,
+  formatPointsMagnitude,
+  formatSignificant,
+  formatWeekdayShort,
+} from '../lib/format'
 import { isoToDayIndex, weekday } from '../lib/time/riyadh'
+import { detectInsights, incidentsOf } from '../insights/detect'
 import { comparisonRange } from '../state/presets'
 import { useDrill } from '../state/drill'
 import {
@@ -44,6 +57,19 @@ const RESOLUTION_HEIGHT = 140
 const PANEL_GAP = 16
 const TOOL_ERROR_HEIGHT = 84
 const AXIS_HEIGHT = 18
+
+/** Where an incident's label sits inside the resolution panel, from its top. */
+const CALLOUT_LABEL_Y = 10
+
+/**
+ * Assumed width of one character of the callout label, in pixels.
+ *
+ * SVG text cannot be measured before it is drawn, and measuring it afterwards
+ * would cost a layout pass per frame. An estimate is enough here because it is
+ * only used to keep the label inside the plot: erring wide costs a few pixels
+ * of margin, and erring narrow would push a word over the value axis.
+ */
+const CALLOUT_CHAR_WIDTH = 5.4
 
 /** Where each panel's plot area begins, measured from the top of the SVG. */
 const RESOLUTION_TOP = PANEL_TITLE_HEIGHT
@@ -70,6 +96,40 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
 
   const summary = useMemo(() => summarizeTrend(points, filters.range), [points, filters.range])
 
+  /*
+   * The same pass the Fix-first widget runs. Incidents are found over the
+   * whole daily series regardless of the selected range, which is why a
+   * callout can appear outside the highlighted band — the chart draws the
+   * quarter, so it marks the quarter.
+   */
+  const incidents = useMemo(
+    () => incidentsOf(detectInsights(data, { range: filters.range, bounds })),
+    [data, filters.range, bounds],
+  )
+
+  /** The short note for each day an incident covers, keyed by day index. */
+  const notes = useMemo(() => {
+    const byDay = new Map<number, string>()
+
+    for (const incident of incidents) {
+      const note =
+        incident.params.toolErrorRatio !== null
+          ? t('trend.noteIncident', {
+              ratio: formatSignificant(lang, incident.params.toolErrorRatio),
+            })
+          : t('trend.noteIncidentResolution', {
+              points: formatPointsMagnitude(lang, incident.params.resolutionDrop ?? 0),
+            })
+
+      // Every day of a merged incident carries the note, so the table does
+      // not show Tuesday as remarkable and Wednesday as ordinary.
+      for (let day = incident.evidence.range.from; day <= incident.evidence.range.to; day++) {
+        byDay.set(day, note)
+      }
+    }
+    return byDay
+  }, [incidents, lang, t])
+
   const toolErrorMax = useMemo(() => niceRateMax(points, (p) => p.toolErrorRate), [points])
 
   const ramadan = useMemo(
@@ -93,13 +153,31 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
 
     if (point.calls === 0) return t('trend.pointNoCalls', { date, weekday: day })
 
-    return t('trend.point', {
+    const sentence = t('trend.point', {
       date,
       weekday: day,
       resolution: formatPercent(lang, point.resolutionRate ?? 0),
       toolError: formatPercent(lang, point.toolErrorRate ?? 0),
       calls: formatInt(lang, point.calls),
     })
+
+    // The marker is a visual cue; someone arriving by keyboard gets the same
+    // fact in the same breath as the day's numbers, not instead of them.
+    const note = notes.get(point.dayIndex)
+    return note === undefined ? sentence : `${sentence} ${note}.`
+  }
+
+  /** "2 days flagged as incidents: 25 Aug, 3 Sep." Empty when there are none. */
+  const incidentSentence = (): string => {
+    if (incidents.length === 0) return ''
+
+    const days = incidents
+      .map((incident) => formatDay(lang, incident.day))
+      .reverse() // oldest first, which is how a sentence reads
+      .join(', ')
+
+    const key = incidents.length === 1 ? 'trend.summaryIncidents' : 'trend.summaryIncidentsPlural'
+    return t(key, { count: formatInt(lang, incidents.length), days })
   }
 
   const summarySentence = (): string => {
@@ -117,12 +195,16 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
 
     // No calls in the selected window: promising an average for it would be a
     // number invented out of nothing.
-    if (summary.selectedAverage === undefined) return t('trend.summaryNoSelection', common)
+    const base =
+      summary.selectedAverage === undefined
+        ? t('trend.summaryNoSelection', common)
+        : t('trend.summary', {
+            ...common,
+            selectedAverage: formatPercent(lang, summary.selectedAverage),
+          })
 
-    return t('trend.summary', {
-      ...common,
-      selectedAverage: formatPercent(lang, summary.selectedAverage),
-    })
+    const incidentsLine = incidentSentence()
+    return incidentsLine === '' ? base : `${base} ${incidentsLine}`
   }
 
   const drillToDay = (point: DailyPoint): void => {
@@ -191,6 +273,13 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
         row.toolErrorRate === undefined
           ? t('trend.noCalls')
           : formatPercent(lang, row.toolErrorRate),
+    },
+    {
+      // The table view is a peer of the chart, not a fallback, so anything
+      // the chart marks has to be readable here too.
+      key: 'note',
+      header: t('trend.note'),
+      cell: (row) => notes.get(row.dayIndex) ?? '—',
     },
   ]
 
@@ -375,6 +464,62 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                   lang={lang}
                 />
               </g>
+
+              {/*
+                Incident callouts: a rule through both panels at every day an
+                incident covers, and one label per incident at its worst day.
+                Drawn after the series so the rule reads as an annotation over
+                the data, and before the hit targets so the pointer still
+                reaches them.
+              */}
+              {incidents.map((incident) => {
+                const { range } = incident.evidence
+                const days: number[] = []
+                for (let day = range.from; day <= range.to; day++) days.push(day)
+
+                const label = notes.get(incident.day) ?? ''
+                /*
+                 * Clamped into the plot, in the plot's own coordinates. The
+                 * scale is already mirrored for RTL, so clamping here keeps
+                 * the label off the value axis in both directions without a
+                 * branch on language — the axis sits outside this group.
+                 */
+                const halfLabel = (label.length * CALLOUT_CHAR_WIDTH) / 2
+                const labelX = Math.min(
+                  Math.max(x(incident.day), halfLabel),
+                  Math.max(halfLabel, innerWidth - halfLabel),
+                )
+
+                return (
+                  <g key={incident.id} transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
+                    {days.map((day) => (
+                      <line
+                        key={day}
+                        x1={x(day)}
+                        x2={x(day)}
+                        y1={0}
+                        y2={TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT - RESOLUTION_TOP}
+                        className="stroke-data-6"
+                        strokeWidth={1}
+                        strokeDasharray="3 3"
+                      />
+                    ))}
+
+                    <text
+                      // A stable hook for the clamping test: "the text that
+                      // happens to contain these words" matched a panel title
+                      // in Arabic and passed for the wrong reason.
+                      data-callout
+                      x={labelX}
+                      y={CALLOUT_LABEL_Y}
+                      textAnchor="middle"
+                      className="fill-card-foreground text-[9.5px] font-medium"
+                    >
+                      {label}
+                    </text>
+                  </g>
+                )
+              })}
 
               {/* Invisible hit targets: one per day, for hover and click. */}
               <g transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
