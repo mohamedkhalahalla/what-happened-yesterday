@@ -278,6 +278,25 @@ export function formatHour(lang: UiLang, hour: number): string {
   )
 }
 
+/**
+ * A sentiment pair for a table cell: `-0.10 → +0.45`.
+ *
+ * Wrapped in FSI…PDI because it is the worst bidi case in the app — two signed
+ * numbers around a directional arrow. Left bare in an Arabic row, the arrow
+ * and the numbers reorder independently and the cell can read as though
+ * sentiment moved the other way.
+ */
+export function formatSentimentPair(lang: UiLang, start: number, end: number): string {
+  const one = (value: number): string =>
+    numberFormat(lang, {
+      signDisplay: 'always',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+
+  return isolate(`${one(start)}${NBSP}→${NBSP}${one(end)}`)
+}
+
 /** A precise instant, for row-level detail: `20 Sept, 21:43`. */
 export function formatInstant(lang: UiLang, epochSec: number): string {
   return dateFormat(lang, {

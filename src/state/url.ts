@@ -44,6 +44,13 @@ export type Correction =
   | { kind: 'unknownId'; param: UrlListParam; value: string }
   | { kind: 'duplicateId'; param: UrlListParam; value: string }
   | { kind: 'invalidCompare'; value: string }
+  /*
+   * Raised by `parseDrill`, not by `parse` — but it belongs in the same union
+   * so the one notice covers the whole query string. A reader does not care
+   * which parser rejected which parameter; they care that the link they were
+   * sent did not fully survive.
+   */
+  | { kind: 'invalidDrill' }
 
 export type UrlListParam = 'agents' | 'intents' | 'language'
 

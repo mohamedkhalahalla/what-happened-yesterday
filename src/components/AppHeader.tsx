@@ -25,7 +25,18 @@ export function AppHeader({ lastDataDay, currentUser, onUserChange }: AppHeaderP
     <header className="border-b border-border bg-card">
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-5 py-4">
         <div className="min-w-0">
-          <h1 className="text-[19px] font-semibold text-card-foreground">{t('app.title')}</h1>
+          {/*
+            id + tabIndex -1: not a tab stop, but somewhere for focus to land
+            when the drill panel closes and there is no opener to return to
+            (a link straight into a drill-down).
+          */}
+          <h1
+            id="app-title"
+            tabIndex={-1}
+            className="text-[19px] font-semibold text-card-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {t('app.title')}
+          </h1>
           {lastDataDay !== null && (
             <p className="mt-0.5 text-[12.5px] text-muted-foreground">
               {t('app.dataAsOf', { date: formatDayLong(lang, lastDataDay) })}

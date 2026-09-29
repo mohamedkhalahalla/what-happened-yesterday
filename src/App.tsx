@@ -4,14 +4,16 @@
  * when there is no previous period in the data, no delta is shown at all.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppHeader } from './components/AppHeader'
 import { Card } from './components/Card'
 import { Canvas } from './components/canvas/Canvas'
 import { CanvasToolbar } from './components/canvas/CanvasToolbar'
 import { UndoToast } from './components/canvas/UndoToast'
+import { DrillPanel } from './components/drill/DrillPanel'
 import { FilterBar } from './components/filters/FilterBar'
+import type { Dataset } from './data/types'
 import { EngineClient } from './engine/client'
 import { I18nProvider } from './i18n/I18nProvider'
 import { useI18n } from './i18n/useI18n'
@@ -25,9 +27,12 @@ import {
   savePrefs,
   type UserId,
 } from './state/prefs'
+import { DrillContext } from './state/drill'
 import { useAggregates } from './state/useAggregates'
+import { useDrillState } from './state/useDrillState'
 import { useFilterState } from './state/useFilterState'
 import { useLayout } from './state/useLayout'
+import type { Correction } from './state/url'
 import type { RemovedWidget } from './state/layout'
 import type { WidgetId } from './widgets/registry'
 
@@ -56,14 +61,16 @@ function PerfReadout({
 
 function Filtered({
   client,
+  dataset,
   bounds,
   userId,
 }: {
   client: EngineClient | null
+  dataset: Dataset | null
   bounds: DataBounds
   userId: UserId
 }) {
-  const { t } = useI18n()
+  const { lang, t } = useI18n()
   const { state, corrections, update } = useFilterState(bounds)
   const { data, isFetching, workerMs, roundTripMs, error } = useAggregates(client, state, bounds)
   const {
@@ -89,6 +96,40 @@ function Filtered({
   } | null>(null)
   const [focusWidgetId, setFocusWidgetId] = useState<WidgetId | null>(null)
 
+  const drill = useDrillState(client, dataset, state, bounds, lang)
+  const drillOpen = drill.request !== null
+
+  /*
+   * The dashboard stays mounted behind the panel, so its scroll position,
+   * open popovers and widget state all survive. `inert` is what makes that
+   * safe: it removes the whole subtree from the tab order and from assistive
+   * tech in one attribute, which is the job a hand-rolled focus trap would
+   * otherwise do badly.
+   *
+   * Set through a ref because React 18 does not yet render `inert` as a prop.
+   */
+  const dashboardRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const node = dashboardRef.current
+    if (node === null) return
+
+    const element = node as HTMLElement & { inert: boolean }
+    element.inert = drillOpen
+    return () => {
+      element.inert = false
+    }
+  }, [drillOpen])
+
+  /*
+   * One notice, both parsers. `parse` reports what it could not honour in the
+   * filter parameters; `parseDrill` reports the same about the drill
+   * parameter. Merging them here means a half-broken link says so once.
+   */
+  const allCorrections: Correction[] = useMemo(
+    () => (drill.invalid ? [...corrections, { kind: 'invalidDrill' as const }] : corrections),
+    [corrections, drill.invalid],
+  )
+
   const coverage = comparisonCoverage(state.range, bounds)
   // Both must hold: the reader asked for a comparison, and one exists to make.
   const showDelta = state.compare && coverage !== 'none'
@@ -99,6 +140,16 @@ function Filtered({
     setPendingUndo((previous) => ({ record, token: (previous?.token ?? 0) + 1 }))
   }
 
+  /*
+   * Closing hands focus back to whatever opened the panel. Arriving by link
+   * there was no opener, so the page heading takes it instead — anything is
+   * better than dropping focus on `body` and making the reader tab from the
+   * top of the document.
+   */
+  const onCloseDrill = useCallback((): void => {
+    drill.close(document.getElementById('app-title'))
+  }, [drill])
+
   const onAddWidget = (id: WidgetId): void => {
     addWidget(id)
     // A widget appended below the fold is invisible feedback; moving focus to
@@ -107,57 +158,82 @@ function Filtered({
   }
 
   return (
-    <>
-      <FilterBar
-        state={state}
-        bounds={bounds}
-        coverage={coverage}
-        corrections={corrections}
-        onChange={update}
-      />
-
-      <div className="mt-4 flex justify-end">
-        <CanvasToolbar
-          present={layout.items.map((item) => item.id)}
-          onAdd={onAddWidget}
-          onReset={resetLayout}
+    <DrillContext.Provider value={{ openDrill: drill.openDrill }}>
+      {/*
+        The dashboard is wrapped rather than left loose because `inert` needs
+        a single element to sit on. It keeps rendering while the panel is
+        open — see the effect above for why.
+      */}
+      <div ref={dashboardRef}>
+        <FilterBar
+          state={state}
+          bounds={bounds}
+          coverage={coverage}
+          corrections={allCorrections}
+          onChange={update}
         />
-      </div>
 
-      <div className="mt-3">
-        {error !== null && data === null ? (
-          <Card title="" state="error" errorMessage={error} />
-        ) : (
-          <Canvas
-            layout={layout}
-            widgetProps={{ data, filters: state, showDelta, coverage, bounds }}
-            onMove={moveWidget}
-            onReorder={reorder}
-            onResize={resizeWidget}
-            onRemove={onRemoveWidget}
-            focusWidgetId={focusWidgetId}
+        <div className="mt-4 flex justify-end">
+          <CanvasToolbar
+            present={layout.items.map((item) => item.id)}
+            onAdd={onAddWidget}
+            onReset={resetLayout}
+          />
+        </div>
+
+        <div className="mt-3">
+          {error !== null && data === null ? (
+            <Card title="" state="error" errorMessage={error} />
+          ) : (
+            <Canvas
+              layout={layout}
+              widgetProps={{ data, filters: state, showDelta, coverage, bounds }}
+              onMove={moveWidget}
+              onReorder={reorder}
+              onResize={resizeWidget}
+              onRemove={onRemoveWidget}
+              focusWidgetId={focusWidgetId}
+            />
+          )}
+        </div>
+
+        {pendingUndo !== null && (
+          <UndoToast
+            token={pendingUndo.token}
+            message={t('widget.removed')}
+            actionLabel={t('widget.undo')}
+            onAction={() => {
+              restoreWidget(pendingUndo.record)
+              setFocusWidgetId(pendingUndo.record.item.id)
+              setPendingUndo(null)
+            }}
+            onDismiss={() => setPendingUndo(null)}
           />
         )}
+
+        <div className="mt-6">
+          <PerfReadout workerMs={workerMs} roundTripMs={roundTripMs} isFetching={isFetching} />
+        </div>
       </div>
 
-      {pendingUndo !== null && (
-        <UndoToast
-          token={pendingUndo.token}
-          message={t('widget.removed')}
-          actionLabel={t('widget.undo')}
-          onAction={() => {
-            restoreWidget(pendingUndo.record)
-            setFocusWidgetId(pendingUndo.record.item.id)
-            setPendingUndo(null)
-          }}
-          onDismiss={() => setPendingUndo(null)}
+      {drill.request !== null && dataset !== null && (
+        <DrillPanel
+          ds={dataset}
+          request={drill.request}
+          filters={state}
+          rows={drill.rows}
+          counts={drill.counts}
+          loading={drill.loading}
+          failed={drill.failed}
+          contradicts={drill.contradicts}
+          sortKey={drill.sortKey}
+          sortDirection={drill.sortDirection}
+          onSort={drill.setSort}
+          onOutcome={drill.setOutcome}
+          onClose={onCloseDrill}
         />
       )}
-
-      <div className="mt-6">
-        <PerfReadout workerMs={workerMs} roundTripMs={roundTripMs} isFetching={isFetching} />
-      </div>
-    </>
+    </DrillContext.Provider>
   )
 }
 
@@ -169,6 +245,13 @@ function Shell({
   onUserChange: (u: UserId) => void
 }) {
   const [client, setClient] = useState<EngineClient | null>(null)
+  /*
+   * Kept, not just measured. The drill table reads one call at a time out of
+   * the columnar arrays on the main thread, so it needs the dataset itself —
+   * asking the worker per visible row would be a message per 36 pixels of
+   * scrolling.
+   */
+  const [dataset, setDataset] = useState<Dataset | null>(null)
   const [bounds, setBounds] = useState<DataBounds | null>(null)
   const [initError, setInitError] = useState<string | null>(null)
   const { t } = useI18n()
@@ -179,9 +262,10 @@ function Shell({
 
     void (async () => {
       try {
-        const dataset = await engine.init()
+        const loaded = await engine.init()
         if (cancelled) return
-        setBounds(boundsOf(dataset))
+        setDataset(loaded)
+        setBounds(boundsOf(loaded))
         setClient(engine)
       } catch (cause) {
         if (!cancelled) setInitError(cause instanceof Error ? cause.message : String(cause))
@@ -208,7 +292,7 @@ function Shell({
         ) : bounds === null ? (
           <p className="text-[12.5px] text-muted-foreground">{t('state.loading')}</p>
         ) : (
-          <Filtered client={client} bounds={bounds} userId={currentUser} />
+          <Filtered client={client} dataset={dataset} bounds={bounds} userId={currentUser} />
         )}
       </main>
     </div>

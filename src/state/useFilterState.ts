@@ -67,6 +67,17 @@ export function pushSearch(search: string): void {
   applySearch(search, 'push')
 }
 
+/**
+ * The live query string, as a React store.
+ *
+ * Exported so the drill state can subscribe to the same source the filters
+ * use — two independent subscriptions to one URL would be two chances to
+ * disagree about what it currently says.
+ */
+export function useUrlSearch(): string {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
 export type FilterStateHandle = {
   state: FilterState
   /** What the URL asked for but could not have. Empty on a clean link. */
@@ -83,7 +94,7 @@ export type FilterStateHandle = {
  * becomes useful once the dataset has loaded.
  */
 export function useFilterState(bounds: DataBounds): FilterStateHandle {
-  const search = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const search = useUrlSearch()
 
   const parsed = useMemo(() => parse(search, bounds), [search, bounds])
 
