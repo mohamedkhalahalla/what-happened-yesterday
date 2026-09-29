@@ -18,6 +18,14 @@ import { useI18n } from '../i18n/useI18n'
 import { isDefaultSeed } from '../state/seed'
 
 export type SeedControlProps = {
+  /**
+   * The seed the dataset on screen was actually generated from, as reported
+   * by the worker — not the one the URL asks for.
+   *
+   * Those two are the same thing only if every link in the chain worked. When
+   * they are not, the reader should be looking at the truth about the numbers
+   * in front of them, and an e2e test asserts the two agree.
+   */
   seed: number
   /** True while a new quarter is being built; the old one is still on screen. */
   generating: boolean
@@ -41,7 +49,9 @@ export function SeedControl({ seed, generating, onShuffle, onReset }: SeedContro
         thousands — 20,260,927 would read as a number somebody counted. `bdi`
         keeps the digits together when the surrounding text runs right to left.
       */}
-      <bdi className="tabular-nums">{t('seed.value', { seed: String(seed) })}</bdi>
+      <bdi className="tabular-nums" data-testid="seed-in-use">
+        {t('seed.value', { seed: String(seed) })}
+      </bdi>
       <span aria-hidden>·</span>
 
       <button type="button" onClick={onShuffle} title={t('seed.shuffleHint')} className={action}>

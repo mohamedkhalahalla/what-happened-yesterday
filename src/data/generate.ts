@@ -241,9 +241,10 @@ function toSentimentCode(value: number): number {
   return Math.round(clamp(value, -1, 1) * 100)
 }
 
-function allocateDataset(n: number, firstDay: number): Dataset {
+function allocateDataset(n: number, firstDay: number, seed: number): Dataset {
   return {
     n,
+    seed,
     startedAt: new Uint32Array(n),
     dayIdx: new Uint16Array(n),
     hour: new Uint8Array(n),
@@ -412,7 +413,8 @@ export function generateDataset(
 
   const weights = dailyVolumeWeights(firstDay, ramadanFrom, ramadanTo)
   const callsPerDay = allocateLargestRemainder(weights, TOTAL_CALLS)
-  const ds = allocateDataset(TOTAL_CALLS, firstDay)
+  // Recorded, so the dataset can always say which seed produced it.
+  const ds = allocateDataset(TOTAL_CALLS, firstDay, seed >>> 0)
 
   let row = 0
   for (let offset = 0; offset < DAYS; offset++) {

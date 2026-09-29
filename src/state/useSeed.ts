@@ -18,7 +18,14 @@ import { parseSeed, randomSeed, searchWithSeed } from './seed'
 import { pushSearch, useUrlSearch } from './useFilterState'
 
 export type SeedHandle = {
+  /** What the URL asks for. */
   seed: number
+  /**
+   * What the worker actually built, read off the dataset itself. `null` before
+   * the first one arrives. The footer shows this rather than the request, so a
+   * disagreement between the two is visible instead of invisible.
+   */
+  usedSeed: number | null
   /** True when the URL named a seed that could not be read. */
   invalid: boolean
   dataset: Dataset | null
@@ -98,6 +105,7 @@ export function useSeed(client: EngineClient | null): SeedHandle {
 
   return {
     seed,
+    usedSeed: dataset?.seed ?? null,
     invalid: parsed.invalid,
     dataset,
     bounds,

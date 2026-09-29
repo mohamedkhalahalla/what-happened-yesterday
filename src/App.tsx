@@ -329,7 +329,8 @@ function Shell({
 
         <footer className="mt-8 border-t border-border pt-3">
           <SeedControl
-            seed={seed.seed}
+            // The seed the data came from. See SeedControl for why.
+            seed={seed.usedSeed ?? seed.seed}
             generating={seed.generating}
             onShuffle={seed.shuffle}
             onReset={seed.reset}

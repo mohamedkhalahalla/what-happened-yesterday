@@ -59,4 +59,16 @@ export interface Dataset {
   /** Absolute Riyadh day index of the first data day. */
   firstDay: number
   days: number
+  /**
+   * The seed this dataset was actually generated from.
+   *
+   * An invariant, carried by the data rather than tracked beside it. The app
+   * asks the worker for a seed and then shows numbers; if the two ever
+   * disagree — a request that never arrived, a response from a previous
+   * dataset, a URL read after the fact — every figure on screen is honestly
+   * labelled with the wrong provenance and nothing looks broken. With the seed
+   * travelling inside the dataset, "which quarter am I looking at?" has one
+   * answer and it comes from the thing that answered.
+   */
+  seed: number
 }
