@@ -73,7 +73,7 @@ export function FailureReasonsWidget({ data, filters, showDelta, coverage }: Wid
   const drillTo = (row: ReasonRow): void => {
     openDrill({
       range: filters.range,
-      constraints: row.kind === 'abandoned' ? { outcome: 2 } : { handoff: row.code },
+      constraints: row.kind === 'abandoned' ? { outcome: 'abandoned' } : { handoff: row.code },
       source: 'failureReasons',
     })
   }

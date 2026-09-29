@@ -34,7 +34,7 @@ import {
 } from '../lib/format'
 import { compareCounts, compareRates, type Comparison, type Verdict } from '../lib/stats'
 import { COUNT_MIN_RATIO, KPI_MIN_POINTS } from '../lib/thresholds'
-import { useDrill } from '../state/drill'
+import { useDrill, type DrillOutcome } from '../state/drill'
 import type { WidgetProps } from './types'
 
 /** Share of `value` in `total`, as a ratio. No division by zero. */
@@ -77,7 +77,7 @@ type Kpi = {
   tone: DeltaTone
   chip: ChipState
   /** What the drill-down should narrow to, if anything beyond the period. */
-  outcome?: number
+  outcome?: DrillOutcome
 }
 
 /** `deltaTone` cannot be inferred from the sign: rising abandonment is bad. */
@@ -109,7 +109,7 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
     labelKey: MessageKey,
     pick: (counts: Counts) => number,
     higherIsBetter: boolean,
-    outcome: number,
+    outcome: DrillOutcome,
   ): Kpi => {
     const value = rate(pick(current), current.calls)
     // The whole centre, not a segment: one point is ~150 calls a week, which
@@ -138,9 +138,9 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
   const volume = compareCounts(current.calls, previous.calls, COUNT_MIN_RATIO)
 
   const kpis: Kpi[] = [
-    rateKpi('resolution', 'kpi.resolutionRate', (c) => c.resolved, true, 0),
-    rateKpi('transfer', 'kpi.transferRate', (c) => c.transferred, false, 1),
-    rateKpi('abandonment', 'kpi.abandonmentRate', (c) => c.abandoned, false, 2),
+    rateKpi('resolution', 'kpi.resolutionRate', (c) => c.resolved, true, 'resolved'),
+    rateKpi('transfer', 'kpi.transferRate', (c) => c.transferred, false, 'transferred'),
+    rateKpi('abandonment', 'kpi.abandonmentRate', (c) => c.abandoned, false, 'abandoned'),
     {
       key: 'calls',
       label: t('kpi.calls'),
@@ -166,7 +166,7 @@ export function KpisWidget({ data, showDelta, coverage, filters }: WidgetProps) 
     { key: 'abandoned', label: outcomeLabel(lang, 2), value: current.abandoned, tone: 'bad' },
   ]
 
-  const drillTo = (outcome?: number): void => {
+  const drillTo = (outcome?: DrillOutcome): void => {
     openDrill({
       range: filters.range,
       constraints: outcome === undefined ? {} : { outcome },

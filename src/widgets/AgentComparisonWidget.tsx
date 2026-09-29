@@ -61,7 +61,7 @@ export function AgentComparisonWidget({ data, filters, showDelta }: WidgetProps)
     openDrill({
       range: filters.range,
       // The calls he handed over: the question the bar raises.
-      constraints: { agent: row.code, outcome: 1 },
+      constraints: { agent: row.code, outcome: 'transferred' },
       source: 'agentComparison',
     })
   }
