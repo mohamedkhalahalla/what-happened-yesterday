@@ -175,7 +175,13 @@ describe('RECALL across seeds', () => {
     expect(new Set(runs.map((found) => found.agents[0])).size).toBeGreaterThan(1)
     expect(new Set(runs.map((found) => found.intents[0])).size).toBeGreaterThan(1)
     expect(new Set(runs.map((found) => found.incidentDays[0])).size).toBeGreaterThan(1)
-  })
+  }, /*
+   * Twelve datasets in one test, which is seven seconds of generator on a
+   * quiet machine and more on a busy one. Vitest's five-second default is a
+   * budget for a unit test; this is twelve quarters. It was passing only
+   * because nothing else was running.
+   */
+  60_000)
 })
 
 describe('the edges of the quarter', () => {
