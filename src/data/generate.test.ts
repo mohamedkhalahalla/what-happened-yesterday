@@ -1,5 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
-
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   dayIndexToISO,
   isoToDayIndex,
@@ -12,6 +11,18 @@ import { AGENTS, HANDOFF_REASONS, INTENTS, LANGUAGES, OUTCOMES } from './diction
 import { generateDataset } from './generate'
 import { getCall } from './getCall'
 import { NO_HANDOFF, type Dataset } from './types'
+
+/*
+ * Generous timeouts throughout this file.
+ *
+ * Every test here builds at least one 200,000-row quarter, which is a couple
+ * of hundred milliseconds on a quiet machine and several seconds on one busy
+ * running a browser. Vitest's five-second default is a budget for a unit
+ * test; these are datasets. A suite that goes red because something else was
+ * compiling is a suite people learn to re-run rather than read.
+ */
+const DATASET_TIMEOUT_MS = 120_000
+vi.setConfig({ testTimeout: DATASET_TIMEOUT_MS, hookTimeout: DATASET_TIMEOUT_MS })
 
 const RESOLVED = OUTCOMES.indexOf('resolved')
 const TRANSFERRED = OUTCOMES.indexOf('transferred')

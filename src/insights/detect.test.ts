@@ -17,8 +17,7 @@
  * is what a ground-truth file is for; the detectors themselves never see it.
  */
 
-import { describe, expect, it } from 'vitest'
-
+import { describe, expect, it, vi } from 'vitest'
 import { STORY } from '../data/config'
 import { AGENTS, INTENTS } from '../data/dictionaries'
 import { generateDataset } from '../data/generate'
@@ -27,6 +26,18 @@ import type { Aggregates, Counts } from '../engine/types'
 import { dayIndexToISO, isoToDayIndex, weekday } from '../lib/time/riyadh'
 import { boundsOf, comparisonRange, defaultRange, type DataBounds } from '../state/presets'
 import { detectInsights, incidentsOf, ongoingOf, type Insight } from './detect'
+
+/*
+ * Generous timeouts throughout this file.
+ *
+ * Every test here builds at least one 200,000-row quarter, which is a couple
+ * of hundred milliseconds on a quiet machine and several seconds on one busy
+ * running a browser. Vitest's five-second default is a budget for a unit
+ * test; these are datasets. A suite that goes red because something else was
+ * compiling is a suite people learn to re-run rather than read.
+ */
+const DATASET_TIMEOUT_MS = 120_000
+vi.setConfig({ testTimeout: DATASET_TIMEOUT_MS, hookTimeout: DATASET_TIMEOUT_MS })
 
 // --- building aggregates by hand --------------------------------------------
 

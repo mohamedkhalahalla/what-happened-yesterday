@@ -33,8 +33,7 @@
  * a test pass is a threshold fitted to twelve datasets instead of one.
  */
 
-import { describe, expect, it } from 'vitest'
-
+import { describe, expect, it, vi } from 'vitest'
 import { SEED } from '../data/config'
 import { AGENTS, INTENTS } from '../data/dictionaries'
 import { generateDataset } from '../data/generate'
@@ -44,6 +43,18 @@ import type { Aggregates } from '../engine/types'
 import { dayIndexToISO } from '../lib/time/riyadh'
 import { boundsOf, comparisonRange, defaultRange, type DataBounds } from '../state/presets'
 import { detectInsights, incidentsOf, ongoingOf, type Insight } from './detect'
+
+/*
+ * Generous timeouts throughout this file.
+ *
+ * Every test here builds at least one 200,000-row quarter, which is a couple
+ * of hundred milliseconds on a quiet machine and several seconds on one busy
+ * running a browser. Vitest's five-second default is a budget for a unit
+ * test; these are datasets. A suite that goes red because something else was
+ * compiling is a suite people learn to re-run rather than read.
+ */
+const DATASET_TIMEOUT_MS = 120_000
+vi.setConfig({ testTimeout: DATASET_TIMEOUT_MS, hookTimeout: DATASET_TIMEOUT_MS })
 
 /**
  * The seeds, written down so a failure is reproducible.
@@ -175,13 +186,7 @@ describe('RECALL across seeds', () => {
     expect(new Set(runs.map((found) => found.agents[0])).size).toBeGreaterThan(1)
     expect(new Set(runs.map((found) => found.intents[0])).size).toBeGreaterThan(1)
     expect(new Set(runs.map((found) => found.incidentDays[0])).size).toBeGreaterThan(1)
-  }, /*
-   * Twelve datasets in one test, which is seven seconds of generator on a
-   * quiet machine and more on a busy one. Vitest's five-second default is a
-   * budget for a unit test; this is twelve quarters. It was passing only
-   * because nothing else was running.
-   */
-  60_000)
+  })
 })
 
 describe('the edges of the quarter', () => {

@@ -10,8 +10,7 @@
  * told, and the analysis is theatre.
  */
 
-import { beforeAll, describe, expect, it } from 'vitest'
-
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { INTENTS, AGENTS } from '../data/dictionaries'
 import { compareRates } from '../lib/stats'
 import { KPI_MIN_POINTS, SEGMENT_MIN_POINTS } from '../lib/thresholds'
@@ -24,6 +23,18 @@ import { boundsOf, comparisonRange, type DataBounds } from '../state/presets'
 import { buildAgentRows } from './agentsData'
 import { buildIntentRows } from './intentsData'
 import { buildReasonRows } from './reasonsData'
+
+/*
+ * Generous timeouts throughout this file.
+ *
+ * Every test here builds at least one 200,000-row quarter, which is a couple
+ * of hundred milliseconds on a quiet machine and several seconds on one busy
+ * running a browser. Vitest's five-second default is a budget for a unit
+ * test; these are datasets. A suite that goes red because something else was
+ * compiling is a suite people learn to re-run rather than read.
+ */
+const DATASET_TIMEOUT_MS = 120_000
+vi.setConfig({ testTimeout: DATASET_TIMEOUT_MS, hookTimeout: DATASET_TIMEOUT_MS })
 
 let ds: Dataset
 let bounds: DataBounds

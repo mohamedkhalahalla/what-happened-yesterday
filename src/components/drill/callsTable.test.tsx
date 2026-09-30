@@ -27,12 +27,23 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { generateDataset } from '../../data/generate'
 import type { Dataset } from '../../data/types'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { CallsTable } from './CallsTable'
+
+/*
+ * Generous timeouts throughout this file.
+ *
+ * Every test here builds at least one 200,000-row quarter, which is a couple
+ * of hundred milliseconds on a quiet machine and several seconds on one busy
+ * running a browser. Vitest's five-second default is a budget for a unit
+ * test; these are datasets. A suite that goes red because something else was
+ * compiling is a suite people learn to re-run rather than read.
+ */
+const DATASET_TIMEOUT_MS = 120_000
+vi.setConfig({ testTimeout: DATASET_TIMEOUT_MS, hookTimeout: DATASET_TIMEOUT_MS })
 
 const VIEWPORT = { width: 900, height: 600 }
 
