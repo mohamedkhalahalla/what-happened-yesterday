@@ -449,7 +449,27 @@ describe('migration from v1', () => {
     })
 
     expect(ids(layout)).toEqual(['kpis', 'fixFirst'])
-    expect(layout.items[1]!.w).toBe(6)
+    // Their size, not the current default — a stored layout is an
+    // arrangement somebody made, and raising a default does not undo it.
+    expect(layout.items[1]).toEqual({ id: 'fixFirst', w: 6, h: 'S' })
+  })
+
+  it('leaves a stored size alone when the default changes under it', () => {
+    /*
+     * Fix first shipped at height M and now defaults to L. Anyone who was
+     * using it before that keeps the canvas they arranged; only a fresh one,
+     * or a migration inserting the widget for the first time, gets the new
+     * default.
+     */
+    expect(WIDGETS.fixFirst.defaultSize.h).toBe('L')
+
+    const stored = validateLayout({
+      version: LAYOUT_VERSION,
+      items: [{ id: 'fixFirst', w: 12, h: 'M' }],
+    })
+    expect(stored.items[0]!.h).toBe('M')
+
+    expect(defaultLayout().items[0]).toEqual({ id: 'fixFirst', w: 12, h: 'L' })
   })
 
   it('adds it to a canvas that was emptied before it existed', () => {

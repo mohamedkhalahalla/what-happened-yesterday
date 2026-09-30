@@ -52,9 +52,19 @@ export const WIDGETS: Record<WidgetId, WidgetDefinition> = {
     id: 'fixFirst',
     titleKey: 'widget.fixFirst.title',
     descriptionKey: 'widget.fixFirst.description',
-    // Full width because each finding is a headline, its evidence and its
-    // impact on one line; in a third of the canvas they wrap into a paragraph.
-    defaultSize: { w: 12, h: 'M' },
+    /*
+     * Full width because each finding is a headline, its evidence and its
+     * impact on one line; in a third of the canvas they wrap into a paragraph.
+     *
+     * Tall because the widget's job is to show *all* of what it found, and at
+     * M the Incidents section was cut off mid-row — worst in Arabic, where the
+     * text wraps taller. A widget that hides its last finding behind a scroll
+     * is a widget that ranks three things and shows two.
+     *
+     * `minSize` stays S: a reader who deliberately shrinks it gets a scroll,
+     * which is their decision rather than the default.
+     */
+    defaultSize: { w: 12, h: 'L' },
     minSize: { w: 6, h: 'S' },
     glossary: [
       'outlierAgent',
