@@ -25,12 +25,12 @@ URL (?from, to, agents, intents, language, compare, drill, seed)
   -> virtualized table: getCall(copy, row)    visible calls only
 ```
 
-The worker handles generation, aggregation, drill-down, and sorting. It returns compact count arrays. Rates, z-tests in `stats.ts`, and detectors in `detect.ts` run as pure functions on the main thread, where the aggregate inputs make the work negligible.
+The worker handles generation, aggregation, drill-down, and sorting. It returns compact count arrays. Rates, z-tests in `stats.ts`, and detectors in `detect.ts` run as pure functions on the main thread, where the inputs are only a few thousand counts.
 
 A production backend would mainly replace the worker's `init()` step. Once the columns are loaded, filtering, statistics, detectors, widgets, and drill-down can stay unchanged.
 
 ## 3. Data model and generation
-Calls are stored by column instead of as 200,000 objects. Typed arrays hold timestamps, duration, coded dimensions, `handoff`, `sentStart`, `sentEnd`, `toolErrors`, `dayIdx`, and `hour`. The result is about 3 MB rather than roughly 50 to 80 MB, with cheaper scans and structured cloning.
+Calls are stored by column instead of as 200,000 objects. Typed arrays hold timestamps, duration, coded dimensions, `handoff`, `sentStart`, `sentEnd`, `toolErrors`, `dayIdx`, and `hour`. The result is about 3 MB rather than roughly 40 MB of objects, with cheaper scans and structured cloning.
 
 The public `Call` type remains unchanged. `getCall(ds, i)` reconstructs one call for the table or details view. Since virtualization displays about 30 rows, expanding the entire dataset would waste memory and time.
 
@@ -38,29 +38,29 @@ The public `Call` type remains unchanged. `getCall(ds, i)` reconstructs one call
 
 Generation is deterministic: Mulberry32, seed `20260927`, fixed today 2026-09-27, and 90 days from 2026-06-29 through 2026-09-26. It takes about 110 to 160 ms. Volume follows the Saudi workweek, with Friday at 45% and Saturday at 65% of a workday's volume, gentle quarterly growth, and slowly improving resolution. A simulated Ramadan-style period from 2026-07-24 to 2026-08-22 shifts the evening peak to 21:00 through 01:00; it is not Ramadan 1447.
 
-For the default seed, anomaly placement is fixed by hand: Majed transfers too often while handling the same intent mix as his peers, so the cause is the agent and not harder calls; roaming resolution falls from about 72% to 43%; and a bad deployment affects 2026-08-25 from 09:00 to 18:00. Other seeds use a separate random stream in `storyFor(seed)`, so placement does not alter the base call sequence.
+For the default seed, anomaly placement is fixed by hand: Majed transfers too often while handling the same intent mix as his peers, so the cause is the agent and not harder calls; roaming resolution falls from about 69% to 47% between the first and last four weeks; and a bad deployment affects 2026-08-25 from 09:00 to 18:00. Other seeds use a separate random stream in `storyFor(seed)`, so placement does not alter the base call sequence.
 
 `generateDataset(seed, { anomalies: false })` creates the same quarter without planted problems, which supports anomaly-free sweeps. The default dataset is hash-pinned so documented figures cannot drift. Ground truth is limited to generation and tests; linting prevents dashboard code from importing it.
 
 ## 4. Computation and performance
 `aggregate()` scans all 200,000 rows once. Trends and sparklines require the full quarter, so limiting the scan to the selected dates would not remove the main work. It returns counts, not percentages: counts compose across periods, while rates do not.
 
-`drill()` returns matching row numbers in a transferred `Uint32Array`. `sortRows()` sorts indexes rather than objects, using localized rank arrays. The worker retains its buffers, while the main thread gets a structured-clone copy so visible rows can be rebuilt immediately during scrolling.
+`drill()` returns matching row numbers in a transferred `Uint32Array`. `sortRows()` sorts indexes rather than objects, using localized rank arrays. The worker keeps the dataset and hands the main thread a structured-clone copy, so visible rows can be rebuilt immediately during scrolling.
 
 Requests carry the dataset generation they target. Responses from older generations are dropped, preventing stale results after seed changes. This guard fixed a bug where widgets queried before the replacement dataset had loaded because React child effects ran before the parent's effect.
 
 | Operation | Median / p95 |
 | --- | --- |
 | Aggregate | 0.7 to 4.4 ms / under 8 ms |
-| Object plus `new Date` baseline | 7 to 73 ms, 8 to 17 times slower |
-| Drill-down | 0.2 to 0.8 ms |
-| Sort 200,000 rows | 48 to 76 ms in the worker |
-| Last-week browser query | 7.0 ms worker, 7.6 ms round trip |
+| Object plus `new Date` baseline | 7 to 48 ms / up to 60 ms, 7 to 15 times slower |
+| Drill-down | 0.2 to 0.9 ms / under 1.6 ms |
+| Sort 200,000 rows | 34 to 52 ms / under 58 ms, in the worker |
+| Last-week query in the browser (warm) | about 6 ms in the worker, 8 to 15 ms round trip; the first query after load is slower while the page starts up |
 
 ## 5. Riyadh time and URL state
 Asia/Riyadh is fixed at UTC+3 with no daylight saving. `src/lib/time/riyadh.ts` represents dates as days since 1970-01-01 in Riyadh and never uses local `Date` getters. Weeks start on Sunday.
 
-Comparisons are weekday-aligned. Seven days shift back 7, 10 shift back 14, and 30 shift back 35. My first version used the immediately preceding dates. For 17 to 26 September, it reported a false notable volume drop because one range contained two weekends and the other contained one. Moving by whole weeks fixed the comparison. Coverage is `full`, `partial`, or `none`; missing history produces "No comparison data," not negative 100%.
+Comparisons are weekday-aligned. Seven days shift back 7, 10 shift back 14, and 30 shift back 35. My first version used the immediately preceding dates. For 17 to 26 September, it reported a false notable volume drop because one range contained two Fridays and the other only one. Moving by whole weeks fixed the comparison. Coverage is `full`, `partial`, or `none`; missing history produces "No comparison data," not negative 100%.
 
 ESLint bans local `Date` getters and restricts `Intl` and `toLocale*` to `src/lib/format.ts`. Unit tests run under UTC, Los Angeles, and Kiritimati; Playwright repeats the same-number check in three browser timezones.
 
@@ -90,8 +90,8 @@ Linting bans physical CSS such as `left`, `marginLeft`, and `text-left`; bars us
 Charts use the Okabe-Ito palette and avoid red-versus-green-only meaning. Each chart has a short description, a table view, keyboard navigation, and live announcements. Drill-down is a dialog; the mounted dashboard becomes `inert`, and focus returns to the trigger. The virtualized table exposes `aria-rowcount`, while its scroll container, not every row, receives focus.
 
 ## 8. Testing and known limits
-Unit tests cover pure logic under three timezones. Differential tests require the optimized engine to match a slow reference. During development, they were mutation-checked once: four deliberately planted engine bugs each failed more than 20 tests. There is no claim of continuous mutation testing or CI.
+Unit tests cover pure logic under three timezones. Differential tests require the optimized engine to match a slow reference. During development, they were mutation-checked once: four deliberately planted engine bugs each failed 20 to 24 tests. There is no claim of continuous mutation testing or CI.
 
-Detector tests cover recall and false alarms. jsdom checks markup, focus counts, and chart structure. Serial Playwright tests cover URL history, three timezones, drill-down, Back, and overflow in Arabic and English at 1440 px and 390 px.
+Detector tests cover recall and false alarms. jsdom checks markup, focus counts, and chart structure. Serial Playwright tests cover URL history, three timezones, drill-down and Back, and horizontal overflow in Arabic and English at 1440 px and 390 px.
 
-Not yet covered are a keyboard-only phone-width pass, screenshot freshness, pinned Chromium, and step-change trends. Hijri dates, dark mode, export, the peak-hours heatmap, and an ARIA grid for the intent table were deliberately left out.
+Not yet covered are a keyboard-only phone-width pass, screenshot freshness, pinned Chromium, and step-change trends. Hijri dates, dark mode, export, the peak-hours heatmap widget, and an ARIA grid for the intent table were deliberately left out.
