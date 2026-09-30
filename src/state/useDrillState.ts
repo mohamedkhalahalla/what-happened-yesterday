@@ -145,6 +145,10 @@ export function useDrillState(
   const openedInApp = useRef(false)
   /** What had focus when the panel opened, so closing can give it back. */
   const opener = useRef<HTMLElement | null>(null)
+  /** Where focus goes when there is no opener — a link straight into a drill. */
+  const fallbackFocus = useRef<HTMLElement | null>(null)
+  /** Whether the panel was open on the previous render. */
+  const wasOpen = useRef(false)
 
   const contradicts = request !== null && drillContradictsFilters(request, filters)
   const active = client !== null && dataset !== null && request !== null && !contradicts
@@ -214,6 +218,40 @@ export function useDrillState(
   const rows = current?.rows ?? EMPTY_ROWS
   const counts = current?.counts ?? EMPTY_COUNTS
 
+  /*
+   * Focus goes back when the panel closes — whatever closed it.
+   *
+   * This used to live in `close`, which meant it only ran when something
+   * called `close`: the button and Escape. The browser's own back button
+   * closes the panel by changing the URL, so it never ran there, and a
+   * keyboard user who pressed Back was returned to the top of the document
+   * with no idea where they had been. Watching the panel disappear catches
+   * every route out of it, including ones nobody has thought of yet.
+   *
+   * A frame later, because the panel is still in the DOM during this effect
+   * and focusing something behind it loses the focus to `body`.
+   */
+  useEffect(() => {
+    const isOpen = request !== null
+
+    if (wasOpen.current && !isOpen) {
+      const target = opener.current
+      opener.current = null
+
+      // The opener has to still exist: a widget removed while the panel was
+      // open would otherwise swallow focus.
+      const destination =
+        target !== null && document.contains(target) ? target : fallbackFocus.current
+      fallbackFocus.current = null
+
+      if (destination !== null) {
+        window.requestAnimationFrame(() => destination.focus())
+      }
+    }
+
+    wasOpen.current = isOpen
+  }, [request])
+
   const openDrill = useCallback(
     (next: DrillRequest) => {
       openedInApp.current = true
@@ -253,28 +291,17 @@ export function useDrillState(
   )
 
   const close = useCallback((fallback?: HTMLElement | null) => {
+    // Remembered rather than used here: the focus move happens when the panel
+    // actually goes away, which is a render later — and which also happens
+    // when nobody called this at all. See the effect below.
+    fallbackFocus.current = fallback ?? null
+
     if (openedInApp.current) {
       openedInApp.current = false
       // Consume the entry that opening pushed, rather than stranding it.
       window.history.back()
     } else {
       replaceSearch(searchWith(null))
-    }
-
-    /*
-     * Back to whatever opened it. The element has to still be in the document
-     * — a widget removed while the panel was open would otherwise swallow
-     * focus — and on a direct load there was never an opener at all, so the
-     * caller's fallback (the page heading) takes over.
-     *
-     * A frame later, because the panel is still mounted during this call and
-     * focusing something inside an element about to unmount loses it to body.
-     */
-    const target = opener.current
-    opener.current = null
-    const destination = target !== null && document.contains(target) ? target : (fallback ?? null)
-    if (destination !== null) {
-      window.requestAnimationFrame(() => destination.focus())
     }
   }, [])
 
