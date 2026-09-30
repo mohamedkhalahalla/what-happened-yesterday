@@ -14,7 +14,7 @@ export const ar: Record<MessageKey, string> = {
   'lang.toggle': 'English',
   'lang.toggleAria': 'التبديل إلى الإنجليزية',
 
-  'user.switcher': 'عرض باسم',
+  'user.switcher': 'من وجهة نظر',
   'user.abdullah.name': 'عبدالله',
   'user.abdullah.role': 'مدير العناية بالعملاء',
   'user.vp.name': 'ليلى',
