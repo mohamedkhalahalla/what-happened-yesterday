@@ -61,7 +61,18 @@ export default defineConfig({
      * and whatever Chrome the machine happens to have is not.
      */
     channel: 'chrome',
-    trace: 'retain-on-failure',
+    /*
+     * Traces are opt-in: `cross-env PWTRACE=1 npm run test:e2e`.
+     *
+     * `retain-on-failure` records continuously and deletes on success, and on
+     * Windows that recording races its own temp files — three tests in one
+     * run failed with `browserContext.close: ENOENT ... recording2.network`,
+     * having asserted nothing. A harness that reports failures the code did
+     * not cause is worse than one with no traces, because the next real
+     * failure gets waved through as "probably that flake again".
+     */
+    trace: process.env.PWTRACE === '1' ? 'retain-on-failure' : 'off',
+    // A single image written once per failure, which does not have that problem.
     screenshot: 'only-on-failure',
   },
 
