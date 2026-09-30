@@ -10,8 +10,14 @@
  * Both languages every time. RTL is not a translation, it is a different
  * layout, and it is the one nobody checks.
  *
- * 1440x900 and the default seed, so the images are the dashboard as it ships
+ * 1440 wide on the default seed, so the images are the dashboard as it ships
  * and two runs produce the same pictures.
+ *
+ * The dashboard is captured **full page**: at a 900-pixel viewport the fold
+ * lands just above the daily trend, so a cropped image of this app is an
+ * image of its filter bar. The drill panel stays cropped to the viewport,
+ * because it *is* a viewport-height sheet and a full-page capture of it would
+ * be a screenshot of 200,000 rows.
  */
 
 import { expect, test, type Page } from '@playwright/test'
@@ -33,7 +39,7 @@ for (const lang of ['en', 'ar'] as const satisfies readonly Lang[]) {
     await openDashboard(page, '', lang)
     await settle(page)
 
-    await page.screenshot({ path: `${OUT}/dashboard-${lang}.png` })
+    await page.screenshot({ path: `${OUT}/dashboard-${lang}.png`, fullPage: true })
   })
 
   test(`@screenshots drill panel in ${lang}`, async ({ page, context }) => {
@@ -55,6 +61,7 @@ for (const lang of ['en', 'ar'] as const satisfies readonly Lang[]) {
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.waitForTimeout(1200)
 
+    // Viewport, not full page: the panel is a sheet the height of the window.
     await page.screenshot({ path: `${OUT}/drill-${lang}.png` })
   })
 }
