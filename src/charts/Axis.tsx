@@ -122,7 +122,28 @@ export function axisTicks(scale: ScaleLinear<number, number>, count: number): nu
   if (tooClose) ticks.pop()
 
   if (ticks[ticks.length - 1] !== max) ticks.push(max)
-  return ticks
+
+  /*
+   * `count` is a cap, not a suggestion.
+   *
+   * `d3.ticks(2)` on a 0–30% domain returns four, because it optimises for
+   * round numbers rather than for how many you asked for. That is the right
+   * trade at full size and the wrong one in a 30-pixel panel, where four
+   * labels print on top of each other. Thinned from the front so the domain
+   * maximum — the label the tallest bar is read against — is kept either way.
+   */
+  if (ticks.length <= count) return ticks
+
+  const stride = Math.ceil((ticks.length - 1) / (count - 1))
+  const kept: number[] = []
+  // Forward from zero, so the baseline and the steps above it are evenly
+  // spaced and only the last gap can be short.
+  for (let i = 0; i < ticks.length; i += stride) kept.push(ticks[i]!)
+
+  const highest = ticks[ticks.length - 1]!
+  if (kept[kept.length - 1] !== highest) kept.push(highest)
+
+  return kept
 }
 
 /**

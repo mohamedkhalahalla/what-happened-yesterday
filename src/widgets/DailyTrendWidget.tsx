@@ -52,21 +52,97 @@ import {
 } from './dailyTrendData'
 import type { WidgetProps } from './types'
 
-const PANEL_TITLE_HEIGHT = 14
-const RESOLUTION_HEIGHT = 140
+const PANEL_TITLE_HEIGHT = 13
 /** Blank band between the panels, so two plots do not read as one. */
-const PANEL_GAP = 16
-const TOOL_ERROR_HEIGHT = 84
-const AXIS_HEIGHT = 18
+const PANEL_GAP = 10
+const AXIS_HEIGHT = 16
 
 /** Where an incident's label sits inside the resolution panel, from its top. */
 const CALLOUT_LABEL_Y = 10
 
-/** Where each panel's plot area begins, measured from the top of the SVG. */
-const RESOLUTION_TOP = PANEL_TITLE_HEIGHT
-const TOOL_ERROR_TITLE_TOP = RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP
-const TOOL_ERROR_TOP = TOOL_ERROR_TITLE_TOP + PANEL_TITLE_HEIGHT
-const TOTAL_HEIGHT = TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT + AXIS_HEIGHT
+/** Everything in the chart that is not a plot: two titles, the gap, the axis. */
+const CHART_CHROME = PANEL_TITLE_HEIGHT * 2 + PANEL_GAP + AXIS_HEIGHT
+
+/**
+ * The smallest each plot can be drawn at.
+ *
+ * Small, deliberately. The alternative to a cramped tool-error panel is no
+ * tool-error panel, which is what this widget used to do at its default
+ * height: draw a fixed 286-pixel chart into the 128 pixels it had and leave
+ * the rest below the fold — the second panel, the time axis, and the
+ * deploy-day spike the widget exists to show. A short panel still shows a
+ * spike. A hidden one shows nothing.
+ */
+const MIN_RESOLUTION_PLOT = 44
+const MIN_TOOL_ERROR_PLOT = 28
+
+/**
+ * Vertical room one axis label needs before it starts touching the next.
+ *
+ * The labels are 10px text; 26px apart is comfortable. Without this the tick
+ * count was fixed, so a short panel drew five labels over 44 pixels and they
+ * printed on top of each other — legible in the design, illegible at the size
+ * the widget actually gets.
+ */
+const AXIS_LABEL_SPACING = 26
+
+/** How many value ticks fit in a plot of this height, never fewer than two. */
+export function tickCountFor(plotHeight: number): number {
+  return Math.max(2, Math.min(5, Math.floor(plotHeight / AXIS_LABEL_SPACING)))
+}
+
+/** Below this there is no honest way to draw two panels and an axis. */
+const MIN_CHART_HEIGHT = CHART_CHROME + MIN_RESOLUTION_PLOT + MIN_TOOL_ERROR_PLOT
+
+/**
+ * Share of the plot area the resolution panel takes.
+ *
+ * The larger share, because it carries the line everyone reads first against
+ * a full 0–100% axis. The tool-error panel is bars against a small number and
+ * stays readable when short.
+ */
+const RESOLUTION_SHARE = 0.6
+
+export type PanelLayout = {
+  resolutionTop: number
+  resolutionHeight: number
+  toolErrorTitleTop: number
+  toolErrorTop: number
+  toolErrorHeight: number
+  axisTop: number
+}
+
+/**
+ * Divide the height the widget actually has between the two panels.
+ *
+ * Exported because "both panels and the axis fit" is arithmetic, and proving
+ * it by rendering would mean asserting against pixels in a browser for every
+ * height the widget can be given.
+ */
+export function panelLayout(totalHeight: number): PanelLayout {
+  const available = Math.max(totalHeight, MIN_CHART_HEIGHT) - CHART_CHROME
+
+  // Floors first, then the share — a tight box spends what it has on the
+  // minimums rather than giving one panel a share of nothing.
+  const resolutionHeight = Math.max(
+    MIN_RESOLUTION_PLOT,
+    Math.min(available - MIN_TOOL_ERROR_PLOT, Math.round(available * RESOLUTION_SHARE)),
+  )
+  const toolErrorHeight = Math.max(MIN_TOOL_ERROR_PLOT, available - resolutionHeight)
+
+  const resolutionTop = PANEL_TITLE_HEIGHT
+  const toolErrorTitleTop = resolutionTop + resolutionHeight + PANEL_GAP
+  const toolErrorTop = toolErrorTitleTop + PANEL_TITLE_HEIGHT
+
+  return {
+    resolutionTop,
+    resolutionHeight,
+    toolErrorTitleTop,
+    toolErrorTop,
+    toolErrorHeight,
+    axisTop: toolErrorTop + toolErrorHeight,
+  }
+}
 
 /** Room for the value-axis labels on the inline-start side. */
 const GUTTER = 42
@@ -301,8 +377,18 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
       view={view}
       onViewChange={setView}
     >
-      <ResponsiveSvg height={TOTAL_HEIGHT}>
-        {(width) => {
+      <ResponsiveSvg height="fill" minHeight={MIN_CHART_HEIGHT}>
+        {(width, totalHeight) => {
+          /*
+           * Recomputed per render rather than per resize: it is six additions
+           * over a number the observer already measured, and keeping it here
+           * means the panels cannot be drawn from a layout the SVG no longer
+           * has.
+           */
+          const panels = panelLayout(totalHeight)
+          const { resolutionTop, resolutionHeight, toolErrorTitleTop, toolErrorTop } = panels
+          const { toolErrorHeight } = panels
+
           const innerWidth = Math.max(10, width - GUTTER)
           // The gutter sits on the inline-start side, which is the right in RTL.
           const originX = direction.isRtl ? 0 : GUTTER
@@ -311,11 +397,11 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
 
           const resolutionY = scaleLinear()
             .domain([0, 1]) // rates always span the full axis
-            .range([RESOLUTION_HEIGHT - 8, 8])
+            .range([resolutionHeight - 8, 8])
 
           const toolErrorY = scaleLinear()
             .domain([0, toolErrorMax]) // zero-based, top adapts
-            .range([TOOL_ERROR_HEIGHT - 6, 6])
+            .range([toolErrorHeight - 6, 6])
 
           const dayWidth = innerWidth / Math.max(1, points.length - 1)
 
@@ -357,7 +443,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               </text>
 
               {/* Panel 1: resolution rate */}
-              <g transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
+              <g transform={`translate(${originX}, ${resolutionTop})`}>
                 {weekends.map((point) => (
                   <rect
                     key={point.dayIndex}
@@ -365,19 +451,20 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                     x={x(point.dayIndex) - dayWidth / 2}
                     y={0}
                     width={dayWidth}
-                    height={RESOLUTION_HEIGHT}
+                    height={resolutionHeight}
                     className="fill-foreground/[0.04]"
                   />
                 ))}
-                {band(ramadan.from, ramadan.to, 'fill-data-3/10', RESOLUTION_HEIGHT)}
-                {band(previous.from, previous.to, 'fill-muted', RESOLUTION_HEIGHT)}
-                {band(filters.range.from, filters.range.to, 'fill-accent', RESOLUTION_HEIGHT)}
+                {band(ramadan.from, ramadan.to, 'fill-data-3/10', resolutionHeight)}
+                {band(previous.from, previous.to, 'fill-muted', resolutionHeight)}
+                {band(filters.range.from, filters.range.to, 'fill-accent', resolutionHeight)}
 
                 <ValueAxis
                   scale={resolutionY}
                   direction={direction}
                   innerWidth={innerWidth}
                   lang={lang}
+                  tickCount={tickCountFor(resolutionHeight)}
                   asPercent
                 />
 
@@ -401,15 +488,15 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               <line
                 x1={originX}
                 x2={originX + innerWidth}
-                y1={RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP / 2}
-                y2={RESOLUTION_TOP + RESOLUTION_HEIGHT + PANEL_GAP / 2}
+                y1={resolutionTop + resolutionHeight + PANEL_GAP / 2}
+                y2={resolutionTop + resolutionHeight + PANEL_GAP / 2}
                 className="stroke-border"
                 strokeWidth={1}
               />
 
               <text
                 x={originX}
-                y={TOOL_ERROR_TITLE_TOP + PANEL_TITLE_HEIGHT - 4}
+                y={toolErrorTitleTop + PANEL_TITLE_HEIGHT - 4}
                 textAnchor={direction.endAnchor}
                 className="fill-card-foreground text-[10.5px] font-medium"
               >
@@ -417,15 +504,15 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               </text>
 
               {/* Panel 2: tool-error rate */}
-              <g transform={`translate(${originX}, ${TOOL_ERROR_TOP})`}>
-                {band(filters.range.from, filters.range.to, 'fill-accent', TOOL_ERROR_HEIGHT)}
+              <g transform={`translate(${originX}, ${toolErrorTop})`}>
+                {band(filters.range.from, filters.range.to, 'fill-accent', toolErrorHeight)}
 
                 <ValueAxis
                   scale={toolErrorY}
                   direction={direction}
                   innerWidth={innerWidth}
                   lang={lang}
-                  tickCount={3}
+                  tickCount={tickCountFor(toolErrorHeight)}
                   asPercent
                 />
 
@@ -447,7 +534,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               </g>
 
               {/* Shared time axis */}
-              <g transform={`translate(${originX}, ${TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT + 2})`}>
+              <g transform={`translate(${originX}, ${panels.axisTop + 2})`}>
                 <TimeAxis
                   ticks={thinTicks(sundays, innerWidth)}
                   x={(dayIndex) => x(dayIndex)}
@@ -474,14 +561,14 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                 const labelX = clampCalloutX(x(incident.day), label, innerWidth)
 
                 return (
-                  <g key={incident.id} transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
+                  <g key={incident.id} transform={`translate(${originX}, ${resolutionTop})`}>
                     {days.map((day) => (
                       <line
                         key={day}
                         x1={x(day)}
                         x2={x(day)}
                         y1={0}
-                        y2={TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT - RESOLUTION_TOP}
+                        y2={toolErrorTop + toolErrorHeight - resolutionTop}
                         className="stroke-data-6"
                         strokeWidth={1}
                         strokeDasharray="3 3"
@@ -505,7 +592,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
               })}
 
               {/* Invisible hit targets: one per day, for hover and click. */}
-              <g transform={`translate(${originX}, ${RESOLUTION_TOP})`}>
+              <g transform={`translate(${originX}, ${resolutionTop})`}>
                 {points.map((point, index) => (
                   <rect
                     key={point.dayIndex}
@@ -513,7 +600,7 @@ export function DailyTrendWidget({ data, filters, bounds }: WidgetProps) {
                     x={x(point.dayIndex) - dayWidth / 2}
                     y={0}
                     width={Math.max(1, dayWidth)}
-                    height={TOOL_ERROR_TOP + TOOL_ERROR_HEIGHT - RESOLUTION_TOP}
+                    height={toolErrorTop + toolErrorHeight - resolutionTop}
                     className="fill-transparent"
                     onMouseEnter={() => setCursor(index)}
                     onClick={() => drillToDay(point)}
