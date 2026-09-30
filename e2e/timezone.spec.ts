@@ -98,9 +98,16 @@ test('the same numbers in Riyadh, Los Angeles and Kiritimati', async ({ browser 
   for (const search of ['', ONE_DAY]) {
     const label = search === '' ? 'the default view' : 'a single day'
 
-    const [riyadh, ...elsewhere] = await Promise.all(
-      ZONES.map((zone) => readIn(browser, zone, search)),
-    )
+    /*
+     * One at a time. Each context builds a 200,000-row quarter in a worker,
+     * and three of those at once starve each other badly enough that one
+     * misses a 45-second timeout — a failure about contention, in a test
+     * about arithmetic. Sequential is slower and says what it means.
+     */
+    const readings: Awaited<ReturnType<typeof readIn>>[] = []
+    for (const zone of ZONES) readings.push(await readIn(browser, zone, search))
+
+    const [riyadh, ...elsewhere] = readings
 
     for (const [index, reading] of elsewhere.entries()) {
       const zone = ZONES[index + 1]!
