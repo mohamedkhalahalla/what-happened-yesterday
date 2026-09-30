@@ -245,7 +245,13 @@ function Section({
         is what to do first.
       */}
       {numbered ? (
-        <ol className="mt-0.5 list-inside list-decimal marker:text-[11px] marker:text-muted-foreground">
+        /*
+         * `list-outside`, with the markers in a gutter of their own.
+         * `list-inside` puts the marker in the line box of the item's first
+         * child, and every item here begins with a block — so the number got
+         * a line to itself and the ranking read as a list of stray digits.
+         */
+        <ol className="mt-0.5 list-decimal ps-6 marker:text-[11px] marker:text-muted-foreground">
           {items}
         </ol>
       ) : (
